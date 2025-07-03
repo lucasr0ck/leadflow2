@@ -9,13 +9,208 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      campaign_links: {
+        Row: {
+          campaign_id: string
+          contact_id: string
+          created_at: string
+          id: string
+          position: number
+        }
+        Insert: {
+          campaign_id: string
+          contact_id: string
+          created_at?: string
+          id?: string
+          position: number
+        }
+        Update: {
+          campaign_id?: string
+          contact_id?: string
+          created_at?: string
+          id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_links_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "seller_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          slug: string
+          team_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+          team_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clicks: {
+        Row: {
+          campaign_id: string
+          campaign_link_id: string
+          created_at: string
+          id: number
+        }
+        Insert: {
+          campaign_id: string
+          campaign_link_id: string
+          created_at?: string
+          id?: never
+        }
+        Update: {
+          campaign_id?: string
+          campaign_link_id?: string
+          created_at?: string
+          id?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clicks_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clicks_campaign_link_id_fkey"
+            columns: ["campaign_link_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seller_contacts: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          seller_id: string
+          whatsapp_url: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          seller_id: string
+          whatsapp_url: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          seller_id?: string
+          whatsapp_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_contacts_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "sellers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sellers: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          team_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          team_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sellers_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          created_at: string
+          id: string
+          owner_id: string
+          team_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          owner_id: string
+          team_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_id?: string
+          team_name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_next_campaign_link: {
+        Args: { campaign_slug: string }
+        Returns: {
+          link_id: string
+          whatsapp_url: string
+          campaign_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
