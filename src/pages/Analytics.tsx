@@ -73,6 +73,7 @@ export const Analytics = () => {
           ),
           campaign_links!inner (
             seller_contacts!inner (
+              id,
               sellers (
                 name
               )
