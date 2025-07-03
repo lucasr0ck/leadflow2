@@ -10,6 +10,8 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Login } from '@/pages/Login';
 import { Dashboard } from '@/pages/Dashboard';
 import { Sellers } from '@/pages/Sellers';
+import { Campaigns } from '@/pages/Campaigns';
+import { Analytics } from '@/pages/Analytics';
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,7 +22,7 @@ const AppRoutes = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-slate-600">Loading...</div>
+        <div className="text-slate-600">Carregando...</div>
       </div>
     );
   }
@@ -50,6 +52,26 @@ const AppRoutes = () => {
         }
       >
         <Route index element={<Sellers />} />
+      </Route>
+      <Route
+        path="/campaigns"
+        element={
+          <ProtectedRoute>
+            <MainLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Campaigns />} />
+      </Route>
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute>
+            <MainLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Analytics />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

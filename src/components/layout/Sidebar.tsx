@@ -1,13 +1,14 @@
 
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, Users, Megaphone, LogOut } from 'lucide-react';
+import { BarChart3, Users, Megaphone, LogOut, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
-  { name: 'Sellers', href: '/sellers', icon: Users },
-  { name: 'Campaigns', href: '/campaigns', icon: Megaphone },
+  { name: 'Vendedores', href: '/sellers', icon: Users },
+  { name: 'Campanhas', href: '/campaigns', icon: Megaphone },
+  { name: 'Analytics', href: '/analytics', icon: TrendingUp },
 ];
 
 export const Sidebar = () => {
@@ -50,7 +51,7 @@ export const Sidebar = () => {
           className="w-full justify-start text-slate-600 hover:text-slate-800"
         >
           <LogOut className="w-5 h-5 mr-3" />
-          Sign Out
+          Sair
         </Button>
       </div>
     </div>
