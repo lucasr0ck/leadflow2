@@ -60,7 +60,13 @@ export const Sellers = () => {
         .eq('team_id', team.id)
         .order('created_at', { ascending: false });
 
-      setSellers(sellersData || []);
+      // Map seller_contacts to contacts to match our interface
+      const mappedSellers = sellersData?.map(seller => ({
+        ...seller,
+        contacts: seller.seller_contacts || []
+      })) || [];
+
+      setSellers(mappedSellers);
     } catch (error) {
       console.error('Error fetching sellers:', error);
       toast({

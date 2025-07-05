@@ -11,11 +11,18 @@ import { subDays } from 'date-fns';
 
 export const Analytics = () => {
   const [dateRange, setDateRange] = useState({
-    from: subDays(new Date(), 30),
-    to: new Date(),
+    start: subDays(new Date(), 30),
+    end: new Date(),
   });
 
-  const { data: analyticsData, isLoading } = useAnalytics(dateRange);
+  const { analytics, loading } = useAnalytics(dateRange);
+
+  const handleDateRangeChange = (startDate: Date, endDate: Date) => {
+    setDateRange({
+      start: startDate,
+      end: endDate,
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -27,12 +34,11 @@ export const Analytics = () => {
           </p>
         </div>
         <DateRangeFilter
-          dateRange={dateRange}
-          onDateRangeChange={setDateRange}
+          onDateRangeChange={handleDateRangeChange}
         />
       </div>
 
-      {isLoading ? (
+      {loading ? (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[...Array(4)].map((_, i) => (
@@ -46,16 +52,24 @@ export const Analytics = () => {
         </div>
       ) : (
         <>
-          <AnalyticsSummaryCards data={analyticsData?.summary} />
+          <AnalyticsSummaryCards 
+            totalClicks={analytics.totalClicks}
+            campaignCount={analytics.campaignStats.length}
+            sellerCount={analytics.sellerStats.length}
+            dailyAverage={Math.round(analytics.totalClicks / Math.max(analytics.dailyClicks.length, 1))}
+          />
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <DailyClicksChart data={analyticsData?.dailyClicks || []} />
-            <CampaignPerformanceChart data={analyticsData?.campaignPerformance || []} />
+            <DailyClicksChart data={analytics.dailyClicks} />
+            <CampaignPerformanceChart data={analytics.campaignStats} />
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SellerDistributionChart data={analyticsData?.sellerDistribution || []} />
-            <RankingTables data={analyticsData?.rankings} />
+            <SellerDistributionChart data={analytics.sellerStats} />
+            <RankingTables 
+              campaignStats={analytics.campaignStats}
+              sellerStats={analytics.sellerStats}
+            />
           </div>
         </>
       )}
