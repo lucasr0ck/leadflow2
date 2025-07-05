@@ -12,6 +12,8 @@ import { Dashboard } from '@/pages/Dashboard';
 import { Sellers } from '@/pages/Sellers';
 import { Campaigns } from '@/pages/Campaigns';
 import { Analytics } from '@/pages/Analytics';
+import { CampaignAnalytics } from '@/pages/CampaignAnalytics';
+import { PublicRedirect } from '@/pages/PublicRedirect';
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -73,6 +75,16 @@ const AppRoutes = () => {
       >
         <Route index element={<Analytics />} />
       </Route>
+      <Route
+        path="/analytics/campaign/:id"
+        element={
+          <ProtectedRoute>
+            <CampaignAnalytics />
+          </ProtectedRoute>
+        }
+      />
+      {/* Public redirect route - no authentication required */}
+      <Route path="/r/:slug" element={<PublicRedirect />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
