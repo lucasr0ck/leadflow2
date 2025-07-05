@@ -1,16 +1,23 @@
 
 import { Outlet } from 'react-router-dom';
-import { Sidebar } from './Sidebar';
+import { AppSidebar } from './AppSidebar';
+import { MobileHeader } from './MobileHeader';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 
 export const MainLayout = () => {
   return (
-    <div className="flex h-screen bg-slate-50">
-      <Sidebar />
-      <main className="flex-1 overflow-auto">
-        <div className="p-8">
-          <Outlet />
-        </div>
-      </main>
-    </div>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <AppSidebar />
+        <SidebarInset>
+          <MobileHeader />
+          <main className="flex-1 overflow-auto">
+            <div className="p-4 lg:p-8">
+              <Outlet />
+            </div>
+          </main>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   );
 };

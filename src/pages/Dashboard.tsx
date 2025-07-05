@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format, subDays, startOfDay } from 'date-fns';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface DashboardStats {
   activeSellers: number;
@@ -74,7 +75,7 @@ export const Dashboard = () => {
             .lt('created_at', startOfDay(subDays(date, -1)).toISOString())
             .eq('campaigns.team_id', team.id)
             .then(res => ({
-              date: format(date, 'MMM dd'),
+              date: format(date, 'MM/dd'),
               clicks: res.data?.length || 0,
             }))
         );
@@ -104,113 +105,135 @@ export const Dashboard = () => {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-800 mb-2">Dashboard</h1>
-        <p className="text-slate-600">Overview of your lead distribution performance</p>
+        <h1 className="text-2xl lg:text-3xl font-bold text-slate-800 mb-2">Dashboard</h1>
+        <p className="text-sm lg:text-base text-slate-600">Overview of your lead distribution performance</p>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-lg border border-slate-200">
-          <h3 className="text-sm font-medium text-slate-600 mb-2">Active Sellers</h3>
-          <p className="text-3xl font-bold text-slate-800">{stats.activeSellers}</p>
-        </div>
-        <div className="bg-white p-6 rounded-lg border border-slate-200">
-          <h3 className="text-sm font-medium text-slate-600 mb-2">Active Campaigns</h3>
-          <p className="text-3xl font-bold text-slate-800">{stats.activeCampaigns}</p>
-        </div>
-        <div className="bg-white p-6 rounded-lg border border-slate-200">
-          <h3 className="text-sm font-medium text-slate-600 mb-2">Total Clicks (Today)</h3>
-          <p className="text-3xl font-bold text-slate-800">{stats.totalClicksToday}</p>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs lg:text-sm">Active Sellers</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl lg:text-3xl font-bold text-slate-800">{stats.activeSellers}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs lg:text-sm">Active Campaigns</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl lg:text-3xl font-bold text-slate-800">{stats.activeCampaigns}</div>
+          </CardContent>
+        </Card>
+        <Card className="sm:col-span-2 lg:col-span-1">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs lg:text-sm">Total Clicks (Today)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl lg:text-3xl font-bold text-slate-800">{stats.totalClicksToday}</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Performance Chart */}
-      <div className="bg-white p-6 rounded-lg border border-slate-200">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">
-          Performance - Last 30 Days
-        </h3>
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis 
-                dataKey="date" 
-                stroke="#64748b"
-                fontSize={12}
-              />
-              <YAxis stroke="#64748b" fontSize={12} />
-              <Tooltip 
-                contentStyle={{
-                  backgroundColor: 'white',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                }}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="clicks" 
-                stroke="#2D9065" 
-                strokeWidth={2}
-                dot={{ fill: '#2D9065', strokeWidth: 2 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg lg:text-xl">Performance - Last 30 Days</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64 lg:h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis 
+                  dataKey="date" 
+                  stroke="#64748b"
+                  fontSize={12}
+                  tick={{ fontSize: 10 }}
+                />
+                <YAxis 
+                  stroke="#64748b" 
+                  fontSize={12}
+                  tick={{ fontSize: 10 }}
+                />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                  }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="clicks" 
+                  stroke="#2D9065" 
+                  strokeWidth={2}
+                  dot={{ fill: '#2D9065', strokeWidth: 2, r: 3 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Recent Campaigns */}
-      <div className="bg-white rounded-lg border border-slate-200">
-        <div className="p-6 border-b border-slate-200">
-          <h3 className="text-lg font-semibold text-slate-800">Recent Campaigns</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">
-                  Campaign Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">
-                  Slug
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">
-                  Total Clicks
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">
-                  Created
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {recentCampaigns.map((campaign) => (
-                <tr key={campaign.id}>
-                  <td className="px-6 py-4 text-sm font-medium text-slate-800">
-                    {campaign.name}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    {campaign.slug}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    {campaign.clicks?.[0]?.count || 0}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    {format(new Date(campaign.created_at), 'MMM dd, yyyy')}
-                  </td>
-                </tr>
-              ))}
-              {recentCampaigns.length === 0 && (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg lg:text-xl">Recent Campaigns</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[600px]">
+              <thead className="bg-slate-50">
                 <tr>
-                  <td colSpan={4} className="px-6 py-4 text-center text-sm text-slate-500">
-                    No campaigns created yet
-                  </td>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    Campaign Name
+                  </th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    Slug
+                  </th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    Total Clicks
+                  </th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    Created
+                  </th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {recentCampaigns.map((campaign) => (
+                  <tr key={campaign.id}>
+                    <td className="px-4 lg:px-6 py-4 text-sm font-medium text-slate-800">
+                      {campaign.name}
+                    </td>
+                    <td className="px-4 lg:px-6 py-4 text-sm text-slate-600">
+                      {campaign.slug}
+                    </td>
+                    <td className="px-4 lg:px-6 py-4 text-sm text-slate-600">
+                      {campaign.clicks?.[0]?.count || 0}
+                    </td>
+                    <td className="px-4 lg:px-6 py-4 text-sm text-slate-600">
+                      {format(new Date(campaign.created_at), 'MMM dd, yyyy')}
+                    </td>
+                  </tr>
+                ))}
+                {recentCampaigns.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-4 lg:px-6 py-8 text-center text-sm text-slate-500">
+                      No campaigns created yet
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

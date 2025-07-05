@@ -1,111 +1,104 @@
 
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, BarChart3, TrendingUp } from 'lucide-react';
-import { DateRangeFilter } from '@/components/DateRangeFilter';
-import { DailyClicksChart } from '@/components/analytics/DailyClicksChart';
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { Calendar, CalendarDays } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { format, subDays, startOfDay, endOfDay, differenceInDays } from 'date-fns';
+import { DateRange } from 'react-day-picker';
+import { BackButton } from '@/components/BackButton';
 
 interface CampaignData {
   id: string;
   name: string;
   slug: string;
-  is_active: boolean;
-}
-
-interface ClickData {
-  date: string;
-  clicks: number;
+  totalClicks: number;
+  averageDailyClicks: number;
+  chartData: Array<{
+    date: string;
+    clicks: number;
+  }>;
 }
 
 export const CampaignAnalytics = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const { user } = useAuth();
-  
-  const [campaign, setCampaign] = useState<CampaignData | null>(null);
-  const [clickData, setClickData] = useState<ClickData[]>([]);
-  const [totalClicks, setTotalClicks] = useState(0);
-  const [averageDailyClicks, setAverageDailyClicks] = useState(0);
+  const [campaignData, setCampaignData] = useState<CampaignData | null>(null);
   const [loading, setLoading] = useState(true);
-  
-  // Default to last 7 days
-  const [startDate, setStartDate] = useState(startOfDay(subDays(new Date(), 7)));
-  const [endDate, setEndDate] = useState(endOfDay(new Date()));
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: subDays(new Date(), 7),
+    to: new Date(),
+  });
 
   useEffect(() => {
     if (user && id) {
       fetchCampaignData();
     }
-  }, [user, id, startDate, endDate]);
+  }, [user, id, dateRange]);
 
   const fetchCampaignData = async () => {
-    if (!id) return;
-    
-    setLoading(true);
-    
+    if (!id || !dateRange?.from || !dateRange?.to) return;
+
     try {
-      // Fetch campaign details
-      const { data: campaignData, error: campaignError } = await supabase
+      setLoading(true);
+
+      // Get campaign basic info
+      const { data: campaign } = await supabase
         .from('campaigns')
-        .select('*')
+        .select('id, name, slug')
         .eq('id', id)
         .single();
 
-      if (campaignError) {
-        console.error('Error fetching campaign:', campaignError);
-        return;
-      }
+      if (!campaign) return;
 
-      setCampaign(campaignData);
+      // Get clicks in the selected date range
+      const startDate = startOfDay(dateRange.from);
+      const endDate = endOfDay(dateRange.to);
 
-      // Fetch clicks data for the date range
-      const { data: clicksData, error: clicksError } = await supabase
+      const { data: clicksData } = await supabase
         .from('clicks')
         .select('created_at')
         .eq('campaign_id', id)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
-        .order('created_at');
+        .order('created_at', { ascending: true });
 
-      if (clicksError) {
-        console.error('Error fetching clicks:', clicksError);
-        return;
-      }
-
-      // Process clicks data for chart
-      const clicksByDate: { [date: string]: number } = {};
+      // Process data for chart
+      const daysDiff = differenceInDays(endDate, startDate) + 1;
+      const chartData = [];
       
-      clicksData?.forEach(click => {
-        const date = format(new Date(click.created_at), 'dd/MM', { locale: ptBR });
-        clicksByDate[date] = (clicksByDate[date] || 0) + 1;
-      });
+      for (let i = 0; i < daysDiff; i++) {
+        const currentDate = subDays(endDate, daysDiff - 1 - i);
+        const dayStart = startOfDay(currentDate);
+        const dayEnd = endOfDay(currentDate);
+        
+        const dayClicks = clicksData?.filter(click => {
+          const clickDate = new Date(click.created_at);
+          return clickDate >= dayStart && clickDate <= dayEnd;
+        }).length || 0;
 
-      // Create array with all dates in range
-      const chartData: ClickData[] = [];
-      const currentDate = new Date(startDate);
-      
-      while (currentDate <= endDate) {
-        const dateKey = format(currentDate, 'dd/MM', { locale: ptBR });
         chartData.push({
-          date: dateKey,
-          clicks: clicksByDate[dateKey] || 0
+          date: format(currentDate, 'MM/dd'),
+          clicks: dayClicks,
         });
-        currentDate.setDate(currentDate.getDate() + 1);
       }
 
-      setClickData(chartData);
-      setTotalClicks(clicksData?.length || 0);
-      
-      // Calculate average daily clicks
-      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      setAverageDailyClicks(daysDiff > 0 ? Math.round((clicksData?.length || 0) / daysDiff) : 0);
+      const totalClicks = clicksData?.length || 0;
+      const averageDailyClicks = daysDiff > 0 ? Math.round(totalClicks / daysDiff * 10) / 10 : 0;
 
+      setCampaignData({
+        id: campaign.id,
+        name: campaign.name,
+        slug: campaign.slug,
+        totalClicks,
+        averageDailyClicks,
+        chartData,
+      });
     } catch (error) {
       console.error('Error fetching campaign analytics:', error);
     } finally {
@@ -113,94 +106,167 @@ export const CampaignAnalytics = () => {
     }
   };
 
-  const handleDateRangeChange = (newStartDate: Date, newEndDate: Date) => {
-    setStartDate(newStartDate);
-    setEndDate(newEndDate);
+  const handleDateRangeSelect = (range: DateRange | undefined) => {
+    setDateRange(range);
+  };
+
+  const setPresetRange = (days: number) => {
+    setDateRange({
+      from: subDays(new Date(), days - 1),
+      to: new Date(),
+    });
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-slate-600">Carregando analytics...</div>
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <BackButton />
+          <div className="h-8 w-48 bg-slate-200 animate-pulse rounded" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="h-32 bg-slate-100 animate-pulse rounded-lg" />
+          <div className="h-32 bg-slate-100 animate-pulse rounded-lg" />
+        </div>
+        <div className="h-80 bg-slate-100 animate-pulse rounded-lg" />
       </div>
     );
   }
 
-  if (!campaign) {
+  if (!campaignData) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-slate-600">Campanha não encontrada</div>
+      <div className="space-y-6">
+        <BackButton />
+        <div className="text-center py-12">
+          <p className="text-slate-500">Campanha não encontrada</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/campaigns')}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Voltar
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-800">{campaign.name}</h1>
-              <p className="text-slate-600">Analytics detalhados da campanha</p>
-            </div>
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <BackButton />
+        <div className="flex-1">
+          <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">{campaignData.name}</h1>
+          <p className="text-sm lg:text-base text-slate-600">Analytics detalhado da campanha</p>
         </div>
+      </div>
 
-        {/* Date Range Filter */}
+      {/* Date Range Picker */}
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="justify-start text-left font-normal">
+              <CalendarDays className="mr-2 h-4 w-4" />
+              {dateRange?.from ? (
+                dateRange.to ? (
+                  <>
+                    {format(dateRange.from, "dd/MM/y")} -{" "}
+                    {format(dateRange.to, "dd/MM/y")}
+                  </>
+                ) : (
+                  format(dateRange.from, "dd/MM/y")
+                )
+              ) : (
+                <span>Selecionar período</span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <div className="p-3 border-b space-y-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setPresetRange(7)}
+                className="w-full justify-start"
+              >
+                Últimos 7 dias
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setPresetRange(30)}
+                className="w-full justify-start"
+              >
+                Últimos 30 dias
+              </Button>
+            </div>
+            <CalendarComponent
+              initialFocus
+              mode="range"
+              defaultMonth={dateRange?.from}
+              selected={dateRange}
+              onSelect={handleDateRangeSelect}
+              numberOfMonths={2}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle>Filtro de Período</CardTitle>
-            <CardDescription>Selecione o período para visualizar os dados</CardDescription>
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs lg:text-sm">Total de Cliques (período)</CardDescription>
           </CardHeader>
           <CardContent>
-            <DateRangeFilter
-              onDateRangeChange={handleDateRangeChange}
-              defaultRange="week"
-            />
+            <div className="text-2xl lg:text-3xl font-bold text-slate-800">{campaignData.totalClicks}</div>
           </CardContent>
         </Card>
-
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total de Cliques</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-[#2D9065]">{totalClicks}</div>
-              <p className="text-xs text-muted-foreground">
-                No período selecionado
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Média Diária</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{averageDailyClicks}</div>
-              <p className="text-xs text-muted-foreground">
-                Cliques por dia
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Daily Clicks Chart */}
-        <DailyClicksChart data={clickData} />
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs lg:text-sm">Média Diária de Cliques</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl lg:text-3xl font-bold text-slate-800">{campaignData.averageDailyClicks}</div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg lg:text-xl">Cliques por Dia</CardTitle>
+          <CardDescription>Evolução dos cliques no período selecionado</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64 lg:h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={campaignData.chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis 
+                  dataKey="date" 
+                  stroke="#64748b"
+                  fontSize={12}
+                  tick={{ fontSize: 10 }}
+                />
+                <YAxis 
+                  stroke="#64748b" 
+                  fontSize={12}
+                  tick={{ fontSize: 10 }}
+                />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                  }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="clicks" 
+                  stroke="#2D9065" 
+                  strokeWidth={2}
+                  dot={{ fill: '#2D9065', strokeWidth: 2, r: 3 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
