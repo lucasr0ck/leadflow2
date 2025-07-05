@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { SellerWithContacts } from '@/types/database';
+import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 
 export const Sellers = () => {
   const { user } = useAuth();
@@ -20,6 +20,15 @@ export const Sellers = () => {
   const [contacts, setContacts] = useState<{ whatsapp_url: string; description: string }[]>([
     { whatsapp_url: '', description: '' },
   ]);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    open: boolean;
+    sellerId: string | null;
+    sellerName: string;
+  }>({
+    open: false,
+    sellerId: null,
+    sellerName: '',
+  });
 
   useEffect(() => {
     if (user) {
@@ -158,26 +167,71 @@ export const Sellers = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (sellerId: string) => {
-    if (!confirm('Are you sure you want to delete this seller?')) return;
+  const handleDeleteClick = (seller: SellerWithContacts) => {
+    setDeleteConfirmation({
+      open: true,
+      sellerId: seller.id,
+      sellerName: seller.name,
+    });
+  };
+
+  const handleDeleteConfirm = async () => {
+    const { sellerId } = deleteConfirmation;
+    if (!sellerId) return;
 
     try {
-      await supabase.from('sellers').delete().eq('id', sellerId);
-      
+      // First, delete all seller_contacts associated with this seller
+      const { error: contactsError } = await supabase
+        .from('seller_contacts')
+        .delete()
+        .eq('seller_id', sellerId);
+
+      if (contactsError) {
+        console.error('Error deleting seller contacts:', contactsError);
+        throw contactsError;
+      }
+
+      // Then, delete the seller
+      const { error: sellerError } = await supabase
+        .from('sellers')
+        .delete()
+        .eq('id', sellerId);
+
+      if (sellerError) {
+        console.error('Error deleting seller:', sellerError);
+        throw sellerError;
+      }
+
       toast({
         title: 'Success',
         description: 'Seller deleted successfully',
       });
-      
-      fetchSellers();
+
+      // Update the UI by removing the seller from the list
+      setSellers(prevSellers => prevSellers.filter(seller => seller.id !== sellerId));
+
+      // Close the confirmation dialog
+      setDeleteConfirmation({
+        open: false,
+        sellerId: null,
+        sellerName: '',
+      });
     } catch (error) {
       console.error('Error deleting seller:', error);
       toast({
         title: 'Error',
-        description: 'Failed to delete seller',
+        description: 'Failed to delete seller. Please try again.',
         variant: 'destructive',
       });
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmation({
+      open: false,
+      sellerId: null,
+      sellerName: '',
+    });
   };
 
   const addContactField = () => {
@@ -317,7 +371,7 @@ export const Sellers = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDelete(seller.id)}
+                    onClick={() => handleDeleteClick(seller)}
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -354,6 +408,17 @@ export const Sellers = () => {
           )}
         </div>
       </div>
+
+      <ConfirmationDialog
+        open={deleteConfirmation.open}
+        onOpenChange={handleDeleteCancel}
+        title="Delete Seller"
+        description={`Are you sure you want to delete "${deleteConfirmation.sellerName}"? This action cannot be undone and will also delete all associated contacts.`}
+        onConfirm={handleDeleteConfirm}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </div>
   );
 };
