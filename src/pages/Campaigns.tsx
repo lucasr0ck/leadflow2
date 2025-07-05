@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,7 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit2, Trash2, Users, BarChart3 } from 'lucide-react';
+import { ConfirmationDialog } from '@/components/ConfirmationDialog';
+import { CampaignCard } from '@/components/campaigns/CampaignCard';
+import { Plus } from 'lucide-react';
 import { CampaignWithLinks, SellerWithContacts } from '@/types/database';
 
 export const Campaigns = () => {
@@ -21,6 +22,8 @@ export const Campaigns = () => {
   const [campaignSlug, setCampaignSlug] = useState('');
   const [selectedSellers, setSelectedSellers] = useState<string[]>([]);
   const [distributionConfig, setDistributionConfig] = useState<{[sellerId: string]: number}>({});
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -98,11 +101,9 @@ export const Campaigns = () => {
     
     if (totalContacts === 0) return {};
     
-    // Distribuição equilibrada baseada no número de contatos por vendedor
     const distribution: {[sellerId: string]: number} = {};
     selectedSellerData.forEach(seller => {
       const contactCount = seller.seller_contacts.length;
-      // Cada vendedor deve ter pelo menos 1 posição por contato para distribuição equilibrada
       distribution[seller.id] = contactCount;
     });
     
@@ -133,19 +134,16 @@ export const Campaigns = () => {
       const slug = campaignSlug || generateSlug(campaignName);
 
       if (editingCampaign) {
-        // Update existing campaign
         await supabase
           .from('campaigns')
           .update({ name: campaignName, slug })
           .eq('id', editingCampaign.id);
 
-        // Delete existing campaign links
         await supabase
           .from('campaign_links')
           .delete()
           .eq('campaign_id', editingCampaign.id);
 
-        // Create new distribution
         await createCampaignLinks(editingCampaign.id);
 
         toast({
@@ -153,7 +151,6 @@ export const Campaigns = () => {
           description: 'Campanha atualizada com sucesso',
         });
       } else {
-        // Create new campaign
         const { data: newCampaign } = await supabase
           .from('campaigns')
           .insert({
@@ -174,7 +171,6 @@ export const Campaigns = () => {
         });
       }
 
-      // Reset form
       resetForm();
       fetchCampaigns();
     } catch (error) {
@@ -192,14 +188,12 @@ export const Campaigns = () => {
     const campaignLinks: any[] = [];
     let position = 1;
 
-    // Criar links baseado na distribuição configurada
     for (const sellerId of selectedSellers) {
       const seller = sellers.find(s => s.id === sellerId);
       if (!seller) continue;
 
       const repetitions = distribution[sellerId] || 1;
       
-      // Para cada repetição, adicionar todos os contatos do vendedor
       for (let rep = 0; rep < repetitions; rep++) {
         for (const contact of seller.seller_contacts) {
           campaignLinks.push({
@@ -211,13 +205,11 @@ export const Campaigns = () => {
       }
     }
 
-    // Embaralhar os links para distribuição aleatória
     for (let i = campaignLinks.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [campaignLinks[i], campaignLinks[j]] = [campaignLinks[j], campaignLinks[i]];
     }
 
-    // Reordenar as posições após embaralhar
     campaignLinks.forEach((link, index) => {
       link.position = index + 1;
     });
@@ -234,13 +226,11 @@ export const Campaigns = () => {
     setCampaignName(campaign.name);
     setCampaignSlug(campaign.slug);
     
-    // Extrair vendedores únicos da campanha
     const sellersInCampaign = new Set(
       campaign.campaign_links.map(link => link.seller_contacts.sellers.id)
     );
     setSelectedSellers(Array.from(sellersInCampaign));
     
-    // Calcular distribuição atual
     const currentDistribution: {[sellerId: string]: number} = {};
     Array.from(sellersInCampaign).forEach(sellerId => {
       const linksForSeller = campaign.campaign_links.filter(
@@ -255,11 +245,16 @@ export const Campaigns = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (campaignId: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta campanha?')) return;
+  const handleDeleteClick = (campaignId: string) => {
+    setCampaignToDelete(campaignId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!campaignToDelete) return;
 
     try {
-      await supabase.from('campaigns').delete().eq('id', campaignId);
+      await supabase.from('campaigns').delete().eq('id', campaignToDelete);
       
       toast({
         title: 'Sucesso',
@@ -274,6 +269,9 @@ export const Campaigns = () => {
         description: 'Falha ao excluir campanha',
         variant: 'destructive',
       });
+    } finally {
+      setDeleteDialogOpen(false);
+      setCampaignToDelete(null);
     }
   };
 
@@ -292,7 +290,6 @@ export const Campaigns = () => {
         ? prev.filter(id => id !== sellerId)
         : [...prev, sellerId];
       
-      // Recalcular distribuição quando seleção muda
       if (newSelection.length > 0) {
         const newDistribution = calculateDistribution();
         setDistributionConfig(newDistribution);
@@ -307,18 +304,6 @@ export const Campaigns = () => {
       ...prev,
       [sellerId]: Math.max(1, count)
     }));
-  };
-
-  const getCampaignStats = (campaign: CampaignWithLinks) => {
-    const totalLinks = campaign.campaign_links.length;
-    const sellerDistribution: {[sellerName: string]: number} = {};
-    
-    campaign.campaign_links.forEach(link => {
-      const sellerName = link.seller_contacts.sellers.name;
-      sellerDistribution[sellerName] = (sellerDistribution[sellerName] || 0) + 1;
-    });
-
-    return { totalLinks, sellerDistribution };
   };
 
   return (
@@ -462,60 +447,36 @@ export const Campaigns = () => {
         <div className="p-6 border-b border-slate-200">
           <h2 className="text-lg font-semibold text-slate-800">Campanhas Ativas</h2>
         </div>
-        <div className="divide-y divide-slate-200">
-          {campaigns.map((campaign) => {
-            const stats = getCampaignStats(campaign);
-            return (
-              <div key={campaign.id} className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="font-medium text-slate-800">{campaign.name}</h3>
-                    <p className="text-sm text-slate-600">
-                      Slug: {campaign.slug} • {stats.totalLinks} posições totais
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(campaign)}
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(campaign.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="bg-slate-50 p-4 rounded-md">
-                  <h4 className="font-medium text-slate-700 mb-2 flex items-center">
-                    <Users className="w-4 h-4 mr-2" />
-                    Distribuição por Vendedor:
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                    {Object.entries(stats.sellerDistribution).map(([sellerName, count]) => (
-                      <div key={sellerName} className="flex justify-between text-sm">
-                        <span>{sellerName}</span>
-                        <span className="font-medium text-[#2D9065]">{count} posições</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          {campaigns.length === 0 && (
-            <div className="p-6 text-center text-slate-500">
+        <div className="p-6">
+          {campaigns.length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {campaigns.map((campaign) => (
+                <CampaignCard
+                  key={campaign.id}
+                  campaign={campaign}
+                  onEdit={handleEdit}
+                  onDelete={handleDeleteClick}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center text-slate-500 py-12">
               Nenhuma campanha criada ainda. Clique em "Nova Campanha" para começar.
             </div>
           )}
         </div>
       </div>
+
+      <ConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Excluir Campanha"
+        description="Tem certeza que deseja excluir esta campanha? Esta ação não pode ser desfeita e todos os dados relacionados serão perdidos."
+        onConfirm={handleDeleteConfirm}
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        variant="destructive"
+      />
     </div>
   );
 };

@@ -52,6 +52,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_active: boolean
           name: string
           slug: string
           team_id: string
@@ -59,6 +60,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_active?: boolean
           name: string
           slug: string
           team_id: string
@@ -66,6 +68,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_active?: boolean
           name?: string
           slug?: string
           team_id?: string
