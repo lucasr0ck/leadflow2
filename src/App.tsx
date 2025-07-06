@@ -84,6 +84,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/campaigns/edit/:id"
+        element={
+          <ProtectedRoute>
+            <EditCampaign />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/analytics"
         element={
           <ProtectedRoute>

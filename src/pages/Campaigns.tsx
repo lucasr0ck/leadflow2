@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { CampaignCard } from '@/components/campaigns/CampaignCard';
 import { Button } from '@/components/ui/button';
 import { subDays, startOfDay } from 'date-fns';
+import { performDataCleanup } from '@/utils/dataCleanup';
 
 interface Campaign {
   id: string;
@@ -28,9 +29,18 @@ export const Campaigns = () => {
 
   useEffect(() => {
     if (user) {
-      fetchCampaigns();
+      initializeData();
     }
   }, [user]);
+
+  const initializeData = async () => {
+    // Perform one-time data cleanup
+    console.log('Performing authorized data cleanup...');
+    await performDataCleanup();
+    
+    // Then fetch campaigns
+    fetchCampaigns();
+  };
 
   const fetchCampaigns = async () => {
     try {
@@ -164,7 +174,7 @@ export const Campaigns = () => {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
           {campaigns.map((campaign) => (
             <CampaignCard key={campaign.id} campaign={campaign} />
           ))}

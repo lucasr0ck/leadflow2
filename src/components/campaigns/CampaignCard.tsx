@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -49,23 +49,38 @@ export const CampaignCard = ({ campaign }: CampaignCardProps) => {
     }
   };
 
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   return (
-    <Link to={`/analytics/campaign/${campaign.id}`} className="block">
-      <Card className="h-full hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer">
+    <Card className="h-full hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer">
+      <Link to={`/analytics/campaign/${campaign.id}`} className="block h-full">
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <h3 className="text-lg font-semibold text-slate-800 truncate">
               {campaign.name}
             </h3>
-            <Badge 
-              variant={campaign.is_active ? "default" : "secondary"}
-              className={campaign.is_active 
-                ? "bg-green-100 text-green-800 hover:bg-green-100" 
-                : "bg-red-100 text-red-800 hover:bg-red-100"
-              }
-            >
-              {campaign.is_active ? 'Ativo' : 'Inativo'}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Link 
+                to={`/campaigns/edit/${campaign.id}`}
+                onClick={handleEditClick}
+                className="p-1 hover:bg-slate-100 rounded transition-colors"
+                title="Editar campanha"
+              >
+                <Edit className="h-4 w-4 text-slate-600" />
+              </Link>
+              <Badge 
+                variant={campaign.is_active ? "default" : "secondary"}
+                className={campaign.is_active 
+                  ? "bg-green-100 text-green-800 hover:bg-green-100" 
+                  : "bg-red-100 text-red-800 hover:bg-red-100"
+                }
+              >
+                {campaign.is_active ? 'Ativo' : 'Inativo'}
+              </Badge>
+            </div>
           </div>
         </CardHeader>
         
@@ -116,7 +131,7 @@ export const CampaignCard = ({ campaign }: CampaignCardProps) => {
             </div>
           </div>
         </CardContent>
-      </Card>
-    </Link>
+      </Link>
+    </Card>
   );
 };
