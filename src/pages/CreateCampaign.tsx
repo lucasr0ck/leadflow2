@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -25,8 +26,6 @@ export const CreateCampaign = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [sellers, setSellers] = useState<SellerWithContacts[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<CampaignFormData>({
@@ -77,26 +76,6 @@ export const CreateCampaign = () => {
         toast({
           title: "Erro",
           description: "Não foi possível criar a campanha.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Create campaign links
-      const campaignLinks = data.contacts.map((contactData, index) => ({
-        campaign_id: campaign.id,
-        contact_id: contactData.contact_id,
-        position: index,
-      }));
-
-      const { error: linksError } = await supabase
-        .from('campaign_links')
-        .insert(campaignLinks);
-
-      if (linksError) {
-        toast({
-          title: "Erro",
-          description: "Não foi possível criar os links da campanha.",
           variant: "destructive",
         });
         return;
