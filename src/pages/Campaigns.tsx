@@ -34,7 +34,7 @@ export const Campaigns = () => {
   }, [user]);
 
   const initializeData = async () => {
-    // Perform one-time data cleanup
+    // Perform one-time authorized data cleanup
     console.log('Performing authorized data cleanup...');
     await performDataCleanup();
     
@@ -176,7 +176,11 @@ export const Campaigns = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
           {campaigns.map((campaign) => (
-            <CampaignCard key={campaign.id} campaign={campaign} />
+            <CampaignCard 
+              key={campaign.id} 
+              campaign={campaign} 
+              onCampaignDeleted={fetchCampaigns}
+            />
           ))}
         </div>
       )}

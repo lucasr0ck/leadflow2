@@ -209,6 +209,39 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_all_data: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          success: boolean
+          message: string
+        }[]
+      }
+      delete_campaign_and_children: {
+        Args: { campaign_id_to_delete: string }
+        Returns: {
+          success: boolean
+          deleted_clicks_count: number
+          deleted_links_count: number
+          message: string
+        }[]
+      }
+      delete_contact_and_links: {
+        Args: { contact_id_to_delete: string }
+        Returns: {
+          success: boolean
+          deleted_links_count: number
+          message: string
+        }[]
+      }
+      delete_seller_and_children: {
+        Args: { seller_id_to_delete: string }
+        Returns: {
+          success: boolean
+          deleted_contacts_count: number
+          deleted_links_count: number
+          message: string
+        }[]
+      }
       get_next_campaign_link: {
         Args: { campaign_slug: string }
         Returns: {

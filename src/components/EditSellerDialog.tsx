@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -42,10 +41,9 @@ interface EditSellerDialogProps {
   onSellerUpdated: () => void;
 }
 
-// Type for the delete_seller_contact RPC response
+// Type for the delete_contact_and_links RPC response
 interface DeleteContactResponse {
   success: boolean;
-  error?: string;
   deleted_links_count?: number;
   message?: string;
 }
@@ -97,22 +95,22 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
     try {
       setIsDeletingContact(true);
 
-      // Use RPC to call the delete_seller_contact function with proper typing
-      const { data, error } = await supabase.rpc('delete_seller_contact' as any, {
-        contact_id: contactToDelete.id
-      }) as { data: DeleteContactResponse | null; error: any };
+      // Use the new delete_contact_and_links function
+      const { data, error } = await supabase.rpc('delete_contact_and_links', {
+        contact_id_to_delete: contactToDelete.id
+      }) as { data: DeleteContactResponse[] | null; error: any };
 
-      if (error || !data?.success) {
+      if (error || !data || data.length === 0 || !data[0].success) {
         toast({
           title: "Erro",
-          description: data?.error || "Não foi possível remover o contato.",
+          description: data?.[0]?.message || "Não foi possível remover o contato.",
           variant: "destructive",
         });
         return;
       }
 
       // Show success message with details
-      const linksDeleted = data.deleted_links_count || 0;
+      const linksDeleted = data[0].deleted_links_count || 0;
       toast({
         title: "Sucesso",
         description: `Contato removido com sucesso${linksDeleted > 0 ? ` (${linksDeleted} links de campanha também foram removidos)` : ''}.`,
@@ -158,12 +156,8 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
         return;
       }
 
-      // Get existing contacts to determine which to update/delete/create
-      const existingContacts = seller.contacts;
-      const newContacts = data.contacts;
-
       // Update existing contacts and create new ones
-      for (const contact of newContacts) {
+      for (const contact of data.contacts) {
         if (contact.id) {
           // Update existing contact
           const { error: updateError } = await supabase
@@ -222,6 +216,8 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
           
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              
+              
               <FormField
                 control={form.control}
                 name="name"
@@ -272,7 +268,7 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
                             }
                           }}
                           className="text-red-600 hover:text-red-700"
-                          disabled={isSubmitting}
+                          disabled={isSubmitting || isDeletingContact}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -321,14 +317,14 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
                   type="button"
                   variant="outline"
                   onClick={() => onOpenChange(false)}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isDeletingContact}
                   className="flex-1"
                 >
                   Cancelar
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isDeletingContact}
                   className="flex-1"
                 >
                   {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}

@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Edit } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -21,10 +22,10 @@ interface Seller {
   }>;
 }
 
-// Type for the delete_seller_contact RPC response
-interface DeleteContactResponse {
+// Type for the delete_seller_and_children RPC response
+interface DeleteSellerResponse {
   success: boolean;
-  error?: string;
+  deleted_contacts_count?: number;
   deleted_links_count?: number;
   message?: string;
 }
@@ -110,40 +111,26 @@ export const Sellers = () => {
     try {
       setIsDeleting(true);
 
-      // First, delete all seller contacts using the safe deletion function
-      for (const contact of sellerToDelete.contacts) {
-        const { data, error } = await supabase.rpc('delete_seller_contact' as any, {
-          contact_id: contact.id
-        }) as { data: DeleteContactResponse | null; error: any };
+      // Use the new delete_seller_and_children function
+      const { data, error } = await supabase.rpc('delete_seller_and_children', {
+        seller_id_to_delete: sellerToDelete.id
+      }) as { data: DeleteSellerResponse[] | null; error: any };
 
-        if (error || !data?.success) {
-          toast({
-            title: "Erro",
-            description: `Não foi possível remover o contato ${contact.phone_number}.`,
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-
-      // Then delete the seller
-      const { error: sellerError } = await supabase
-        .from('sellers')
-        .delete()
-        .eq('id', sellerToDelete.id);
-
-      if (sellerError) {
+      if (error || !data || data.length === 0 || !data[0].success) {
         toast({
           title: "Erro",
-          description: "Não foi possível remover o vendedor.",
+          description: data?.[0]?.message || "Não foi possível remover o vendedor.",
           variant: "destructive",
         });
         return;
       }
 
+      const contactsDeleted = data[0].deleted_contacts_count || 0;
+      const linksDeleted = data[0].deleted_links_count || 0;
+      
       toast({
         title: "Sucesso",
-        description: "Vendedor removido com sucesso!",
+        description: `Vendedor removido com sucesso! (${contactsDeleted} contatos e ${linksDeleted} links de campanha também foram removidos)`,
       });
 
       // Update the local state
@@ -219,6 +206,7 @@ export const Sellers = () => {
                       variant="ghost" 
                       className="h-8 w-8 p-0"
                       onClick={() => handleEditSeller(seller)}
+                      disabled={isDeleting}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -227,6 +215,7 @@ export const Sellers = () => {
                       variant="ghost" 
                       className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                       onClick={() => handleDeleteSeller(seller)}
+                      disabled={isDeleting}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -274,6 +263,7 @@ export const Sellers = () => {
                   variant="outline" 
                   className="w-full"
                   onClick={() => handleEditSeller(seller)}
+                  disabled={isDeleting}
                 >
                   <Plus className="w-3 h-3 mr-1" />
                   Adicionar Contato
