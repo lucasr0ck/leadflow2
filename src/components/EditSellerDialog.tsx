@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -39,6 +40,14 @@ interface EditSellerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSellerUpdated: () => void;
+}
+
+// Type for the delete_seller_contact RPC response
+interface DeleteContactResponse {
+  success: boolean;
+  error?: string;
+  deleted_links_count?: number;
+  message?: string;
 }
 
 export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }: EditSellerDialogProps) => {
@@ -88,10 +97,10 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
     try {
       setIsDeletingContact(true);
 
-      // Use the new database function for safe deletion
-      const { data, error } = await supabase.rpc('delete_seller_contact', {
+      // Use RPC to call the delete_seller_contact function with proper typing
+      const { data, error } = await supabase.rpc('delete_seller_contact' as any, {
         contact_id: contactToDelete.id
-      });
+      }) as { data: DeleteContactResponse | null; error: any };
 
       if (error || !data?.success) {
         toast({

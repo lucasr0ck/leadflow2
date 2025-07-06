@@ -21,6 +21,14 @@ interface Seller {
   }>;
 }
 
+// Type for the delete_seller_contact RPC response
+interface DeleteContactResponse {
+  success: boolean;
+  error?: string;
+  deleted_links_count?: number;
+  message?: string;
+}
+
 export const Sellers = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -104,9 +112,9 @@ export const Sellers = () => {
 
       // First, delete all seller contacts using the safe deletion function
       for (const contact of sellerToDelete.contacts) {
-        const { data, error } = await supabase.rpc('delete_seller_contact', {
+        const { data, error } = await supabase.rpc('delete_seller_contact' as any, {
           contact_id: contact.id
-        });
+        }) as { data: DeleteContactResponse | null; error: any };
 
         if (error || !data?.success) {
           toast({
