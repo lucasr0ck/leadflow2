@@ -13,6 +13,7 @@ import { Sellers } from '@/pages/Sellers';
 import { CreateSeller } from '@/pages/CreateSeller';
 import { Campaigns } from '@/pages/Campaigns';
 import { CreateCampaign } from '@/pages/CreateCampaign';
+import { EditCampaign } from '@/pages/EditCampaign';
 import { Analytics } from '@/pages/Analytics';
 import { CampaignAnalytics } from '@/pages/CampaignAnalytics';
 import { PublicRedirect } from '@/pages/PublicRedirect';
