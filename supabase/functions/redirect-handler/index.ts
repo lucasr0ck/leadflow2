@@ -33,10 +33,10 @@ serve(async (req) => {
 
     console.log('Processing redirect for slug:', slug);
 
-    // Get campaign by slug
+    // Get campaign by slug with greeting message
     const { data: campaign, error: campaignError } = await supabase
       .from('campaigns')
-      .select('id, name, is_active')
+      .select('id, name, is_active, greeting_message')
       .eq('slug', slug)
       .single();
 
@@ -63,14 +63,14 @@ serve(async (req) => {
       );
     }
 
-    // Get campaign links ordered by position
+    // Get campaign links ordered by position with phone numbers
     const { data: campaignLinks, error: linksError } = await supabase
       .from('campaign_links')
       .select(`
         id,
         position,
         seller_contacts (
-          whatsapp_url
+          phone_number
         )
       `)
       .eq('campaign_id', campaign.id)
@@ -119,18 +119,23 @@ serve(async (req) => {
         }
       });
 
-    const redirectUrl = selectedLink.seller_contacts?.whatsapp_url;
+    const phoneNumber = selectedLink.seller_contacts?.phone_number;
     
-    if (!redirectUrl) {
-      console.error('No WhatsApp URL found for selected link');
+    if (!phoneNumber) {
+      console.error('No phone number found for selected link');
       return new Response(
-        JSON.stringify({ error: 'Invalid campaign configuration' }),
+        JSON.stringify({ error: 'Invalid contact configuration' }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
+
+    // Construct WhatsApp URL with encoded greeting message
+    const greetingMessage = campaign.greeting_message || 'Olá! Gostaria de mais informações.';
+    const encodedMessage = encodeURIComponent(greetingMessage);
+    const redirectUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
 
     console.log('Redirecting to:', redirectUrl);
 

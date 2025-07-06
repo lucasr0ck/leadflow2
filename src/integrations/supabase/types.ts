@@ -51,6 +51,7 @@ export type Database = {
       campaigns: {
         Row: {
           created_at: string
+          greeting_message: string | null
           id: string
           is_active: boolean
           name: string
@@ -59,6 +60,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          greeting_message?: string | null
           id?: string
           is_active?: boolean
           name: string
@@ -67,6 +69,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          greeting_message?: string | null
           id?: string
           is_active?: boolean
           name?: string
@@ -124,22 +127,22 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          phone_number: string
           seller_id: string
-          whatsapp_url: string
         }
         Insert: {
           created_at?: string
           description?: string | null
           id?: string
+          phone_number?: string
           seller_id: string
-          whatsapp_url: string
         }
         Update: {
           created_at?: string
           description?: string | null
           id?: string
+          phone_number?: string
           seller_id?: string
-          whatsapp_url?: string
         }
         Relationships: [
           {

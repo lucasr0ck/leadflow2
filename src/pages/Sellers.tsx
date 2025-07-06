@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Edit } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ interface Seller {
   created_at: string;
   contacts: Array<{
     id: string;
-    whatsapp_url: string;
+    phone_number: string;
     description: string | null;
   }>;
 }
@@ -53,7 +54,7 @@ export const Sellers = () => {
           created_at,
           seller_contacts (
             id,
-            whatsapp_url,
+            phone_number,
             description
           )
         `)
@@ -104,18 +105,22 @@ export const Sellers = () => {
           <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">Vendedores</h1>
           <p className="text-sm lg:text-base text-slate-600 mt-1">Gerencie sua equipe de vendas</p>
         </div>
-        <Button className="sm:w-auto">
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Vendedor
+        <Button asChild className="sm:w-auto">
+          <Link to="/sellers/new">
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Vendedor
+          </Link>
         </Button>
       </div>
 
       {sellers.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-slate-500 mb-4">Nenhum vendedor encontrado</p>
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Adicionar primeiro vendedor
+          <Button asChild>
+            <Link to="/sellers/new">
+              <Plus className="w-4 h-4 mr-2" />
+              Adicionar primeiro vendedor
+            </Link>
           </Button>
         </div>
       ) : (
@@ -150,12 +155,12 @@ export const Sellers = () => {
                 {/* Contacts List */}
                 {seller.contacts && seller.contacts.length > 0 ? (
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-slate-600">WhatsApp Links:</p>
+                    <p className="text-xs font-medium text-slate-600">Números de Contato:</p>
                     <div className="space-y-1 max-h-32 overflow-y-auto">
                       {seller.contacts.map((contact) => (
                         <div key={contact.id} className="p-2 bg-slate-50 rounded text-xs">
                           <p className="font-mono text-slate-700 truncate">
-                            {contact.whatsapp_url}
+                            {contact.phone_number}
                           </p>
                           {contact.description && (
                             <p className="text-slate-500 mt-1 truncate">

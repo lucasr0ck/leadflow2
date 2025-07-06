@@ -16,7 +16,7 @@ export interface Seller {
 export interface SellerContact {
   id: string;
   seller_id: string;
-  whatsapp_url: string;
+  phone_number: string;
   description?: string;
   created_at: string;
 }
@@ -27,6 +27,7 @@ export interface Campaign {
   name: string;
   slug: string;
   is_active: boolean;
+  greeting_message?: string;
   created_at: string;
 }
 

@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { CampaignCard } from '@/components/campaigns/CampaignCard';
@@ -144,18 +145,22 @@ export const Campaigns = () => {
           <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">Campanhas</h1>
           <p className="text-sm lg:text-base text-slate-600 mt-1">Gerencie suas campanhas de distribuição de leads</p>
         </div>
-        <Button className="sm:w-auto">
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Campanha
+        <Button asChild className="sm:w-auto">
+          <Link to="/campaigns/new">
+            <Plus className="w-4 h-4 mr-2" />
+            Nova Campanha
+          </Link>
         </Button>
       </div>
 
       {campaigns.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-slate-500 mb-4">Nenhuma campanha encontrada</p>
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Criar primeira campanha
+          <Button asChild>
+            <Link to="/campaigns/new">
+              <Plus className="w-4 h-4 mr-2" />
+              Criar primeira campanha
+            </Link>
           </Button>
         </div>
       ) : (

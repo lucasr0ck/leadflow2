@@ -10,7 +10,9 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Login } from '@/pages/Login';
 import { Dashboard } from '@/pages/Dashboard';
 import { Sellers } from '@/pages/Sellers';
+import { CreateSeller } from '@/pages/CreateSeller';
 import { Campaigns } from '@/pages/Campaigns';
+import { CreateCampaign } from '@/pages/CreateCampaign';
 import { Analytics } from '@/pages/Analytics';
 import { CampaignAnalytics } from '@/pages/CampaignAnalytics';
 import { PublicRedirect } from '@/pages/PublicRedirect';
@@ -56,6 +58,14 @@ const AppRoutes = () => {
         <Route index element={<Sellers />} />
       </Route>
       <Route
+        path="/sellers/new"
+        element={
+          <ProtectedRoute>
+            <CreateSeller />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/campaigns"
         element={
           <ProtectedRoute>
@@ -65,6 +75,14 @@ const AppRoutes = () => {
       >
         <Route index element={<Campaigns />} />
       </Route>
+      <Route
+        path="/campaigns/new"
+        element={
+          <ProtectedRoute>
+            <CreateCampaign />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/analytics"
         element={
