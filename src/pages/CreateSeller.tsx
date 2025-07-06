@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -29,7 +28,7 @@ export const CreateSeller = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<SellerFormData>({
     resolver: zodResolver(sellerSchema),
@@ -48,7 +47,7 @@ export const CreateSeller = () => {
     if (!user) return;
 
     try {
-      setLoading(true);
+      setIsSubmitting(true);
 
       // Get user's team
       const { data: team } = await supabase
@@ -119,7 +118,7 @@ export const CreateSeller = () => {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -161,6 +160,7 @@ export const CreateSeller = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => append({ phone_number: '', description: '' })}
+                    disabled={isSubmitting}
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Adicionar Contato
@@ -179,6 +179,7 @@ export const CreateSeller = () => {
                             size="sm"
                             onClick={() => remove(index)}
                             className="text-red-600 hover:text-red-700"
+                            disabled={isSubmitting}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -228,17 +229,17 @@ export const CreateSeller = () => {
                   type="button"
                   variant="outline"
                   onClick={() => navigate('/sellers')}
-                  disabled={loading}
+                  disabled={isSubmitting}
                   className="flex-1"
                 >
                   Cancelar
                 </Button>
                 <Button
                   type="submit"
-                  disabled={loading}
+                  disabled={isSubmitting}
                   className="flex-1"
                 >
-                  {loading ? 'Criando...' : 'Criar Vendedor'}
+                  {isSubmitting ? 'Criando...' : 'Criar Vendedor'}
                 </Button>
               </div>
             </form>

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -26,7 +25,9 @@ export const CreateCampaign = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
+  const [sellers, setSellers] = useState<SellerWithContacts[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<CampaignFormData>({
     resolver: zodResolver(campaignSchema),
@@ -41,7 +42,7 @@ export const CreateCampaign = () => {
     if (!user) return;
 
     try {
-      setLoading(true);
+      setIsSubmitting(true);
 
       // Get user's team
       const { data: team } = await supabase
@@ -60,19 +61,42 @@ export const CreateCampaign = () => {
       }
 
       // Create campaign
-      const { error } = await supabase
+      const { data: campaign, error: campaignError } = await supabase
         .from('campaigns')
         .insert({
           name: data.name,
           slug: data.slug,
           greeting_message: data.greeting_message,
           team_id: team.id,
-        });
+          is_active: true,
+        })
+        .select()
+        .single();
 
-      if (error) {
+      if (campaignError || !campaign) {
         toast({
           title: "Erro",
           description: "Não foi possível criar a campanha.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create campaign links
+      const campaignLinks = data.contacts.map((contactData, index) => ({
+        campaign_id: campaign.id,
+        contact_id: contactData.contact_id,
+        position: index,
+      }));
+
+      const { error: linksError } = await supabase
+        .from('campaign_links')
+        .insert(campaignLinks);
+
+      if (linksError) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível criar os links da campanha.",
           variant: "destructive",
         });
         return;
@@ -92,12 +116,12 @@ export const CreateCampaign = () => {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-2xl">
+    <div className="container mx-auto px-4 py-6 max-w-4xl">
       <div className="mb-6">
         <BackButton />
       </div>
@@ -170,17 +194,17 @@ export const CreateCampaign = () => {
                   type="button"
                   variant="outline"
                   onClick={() => navigate('/campaigns')}
-                  disabled={loading}
+                  disabled={isSubmitting}
                   className="flex-1"
                 >
                   Cancelar
                 </Button>
                 <Button
                   type="submit"
-                  disabled={loading}
+                  disabled={isSubmitting}
                   className="flex-1"
                 >
-                  {loading ? 'Criando...' : 'Criar Campanha'}
+                  {isSubmitting ? 'Criando...' : 'Criar Campanha'}
                 </Button>
               </div>
             </form>

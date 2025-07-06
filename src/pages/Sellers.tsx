@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { EditSellerDialog } from '@/components/EditSellerDialog';
+import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 
 interface Seller {
   id: string;
@@ -25,6 +27,11 @@ export const Sellers = () => {
   const { toast } = useToast();
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingSeller, setEditingSeller] = useState<Seller | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [sellerToDelete, setSellerToDelete] = useState<Seller | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -77,6 +84,72 @@ export const Sellers = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEditSeller = (seller: Seller) => {
+    setEditingSeller(seller);
+    setEditDialogOpen(true);
+  };
+
+  const handleDeleteSeller = (seller: Seller) => {
+    setSellerToDelete(seller);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteSeller = async () => {
+    if (!sellerToDelete) return;
+
+    try {
+      setIsDeleting(true);
+
+      // First delete all seller contacts
+      const { error: contactsError } = await supabase
+        .from('seller_contacts')
+        .delete()
+        .eq('seller_id', sellerToDelete.id);
+
+      if (contactsError) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível remover os contatos do vendedor.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Then delete the seller
+      const { error: sellerError } = await supabase
+        .from('sellers')
+        .delete()
+        .eq('id', sellerToDelete.id);
+
+      if (sellerError) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível remover o vendedor.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Sucesso",
+        description: "Vendedor removido com sucesso!",
+      });
+
+      // Update the local state
+      setSellers(prev => prev.filter(s => s.id !== sellerToDelete.id));
+      setDeleteDialogOpen(false);
+    } catch (error) {
+      console.error('Error deleting seller:', error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao remover vendedor.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -133,10 +206,20 @@ export const Sellers = () => {
                     {seller.name}
                   </CardTitle>
                   <div className="flex gap-1 shrink-0">
-                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="h-8 w-8 p-0"
+                      onClick={() => handleEditSeller(seller)}
+                    >
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600 hover:text-red-700">
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                      onClick={() => handleDeleteSeller(seller)}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -178,7 +261,12 @@ export const Sellers = () => {
                 )}
                 
                 {/* Add Contact Button */}
-                <Button size="sm" variant="outline" className="w-full">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => handleEditSeller(seller)}
+                >
                   <Plus className="w-3 h-3 mr-1" />
                   Adicionar Contato
                 </Button>
@@ -187,6 +275,24 @@ export const Sellers = () => {
           ))}
         </div>
       )}
+
+      <EditSellerDialog
+        seller={editingSeller}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSellerUpdated={fetchSellers}
+      />
+
+      <ConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Confirmar Exclusão"
+        description={`Tem certeza que deseja excluir o vendedor "${sellerToDelete?.name}"? Esta ação também removerá todos os contatos associados e não pode ser desfeita.`}
+        onConfirm={confirmDeleteSeller}
+        confirmText={isDeleting ? "Excluindo..." : "Excluir"}
+        cancelText="Cancelar"
+        variant="destructive"
+      />
     </div>
   );
 };
