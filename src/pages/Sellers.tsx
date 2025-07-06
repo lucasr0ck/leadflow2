@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Edit } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -103,19 +102,20 @@ export const Sellers = () => {
     try {
       setIsDeleting(true);
 
-      // First delete all seller contacts
-      const { error: contactsError } = await supabase
-        .from('seller_contacts')
-        .delete()
-        .eq('seller_id', sellerToDelete.id);
-
-      if (contactsError) {
-        toast({
-          title: "Erro",
-          description: "Não foi possível remover os contatos do vendedor.",
-          variant: "destructive",
+      // First, delete all seller contacts using the safe deletion function
+      for (const contact of sellerToDelete.contacts) {
+        const { data, error } = await supabase.rpc('delete_seller_contact', {
+          contact_id: contact.id
         });
-        return;
+
+        if (error || !data?.success) {
+          toast({
+            title: "Erro",
+            description: `Não foi possível remover o contato ${contact.phone_number}.`,
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
       // Then delete the seller
@@ -287,7 +287,7 @@ export const Sellers = () => {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         title="Confirmar Exclusão"
-        description={`Tem certeza que deseja excluir o vendedor "${sellerToDelete?.name}"? Esta ação também removerá todos os contatos associados e não pode ser desfeita.`}
+        description={`Tem certeza que deseja excluir o vendedor "${sellerToDelete?.name}"? Esta ação também removerá todos os contatos associados e links de campanha, e não pode ser desfeita.`}
         onConfirm={confirmDeleteSeller}
         confirmText={isDeleting ? "Excluindo..." : "Excluir"}
         cancelText="Cancelar"

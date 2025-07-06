@@ -1,7 +1,6 @@
-
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Calendar, CalendarDays } from 'lucide-react';
+import { CalendarDays } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +11,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { format, subDays, startOfDay, endOfDay, differenceInDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { BackButton } from '@/components/BackButton';
+import { SellerPerformanceCard } from '@/components/analytics/SellerPerformanceCard';
 
 interface CampaignData {
   id: string;
@@ -124,11 +124,18 @@ export const CampaignAnalytics = () => {
           <BackButton />
           <div className="h-8 w-48 bg-slate-200 animate-pulse rounded" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        {/* KPI Cards Loading */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
           <div className="h-32 bg-slate-100 animate-pulse rounded-lg" />
           <div className="h-32 bg-slate-100 animate-pulse rounded-lg" />
         </div>
-        <div className="h-80 bg-slate-100 animate-pulse rounded-lg" />
+        
+        {/* Main Content Loading */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-2 h-80 bg-slate-100 animate-pulse rounded-lg" />
+          <div className="h-80 bg-slate-100 animate-pulse rounded-lg" />
+        </div>
       </div>
     );
   }
@@ -146,6 +153,7 @@ export const CampaignAnalytics = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <BackButton />
         <div className="flex-1">
@@ -205,7 +213,7 @@ export const CampaignAnalytics = () => {
         </Popover>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards - Full width, side by side on desktop */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
         <Card>
           <CardHeader className="pb-2">
@@ -225,48 +233,64 @@ export const CampaignAnalytics = () => {
         </Card>
       </div>
 
-      {/* Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg lg:text-xl">Cliques por Dia</CardTitle>
-          <CardDescription>Evolução dos cliques no período selecionado</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64 lg:h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={campaignData.chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis 
-                  dataKey="date" 
-                  stroke="#64748b"
-                  fontSize={12}
-                  tick={{ fontSize: 10 }}
-                />
-                <YAxis 
-                  stroke="#64748b" 
-                  fontSize={12}
-                  tick={{ fontSize: 10 }}
-                />
-                <Tooltip 
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                  }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="clicks" 
-                  stroke="#2D9065" 
-                  strokeWidth={2}
-                  dot={{ fill: '#2D9065', strokeWidth: 2, r: 3 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Main Content - Two column layout on desktop */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Main Chart - Takes 2/3 of width on xl screens */}
+        <div className="xl:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg lg:text-xl">Cliques por Dia</CardTitle>
+              <CardDescription>Evolução dos cliques no período selecionado</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64 lg:h-80 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={campaignData.chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis 
+                      dataKey="date" 
+                      stroke="#64748b"
+                      fontSize={12}
+                      tick={{ fontSize: 10 }}
+                    />
+                    <YAxis 
+                      stroke="#64748b" 
+                      fontSize={12}
+                      tick={{ fontSize: 10 }}
+                    />
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="clicks" 
+                      stroke="#2D9065" 
+                      strokeWidth={2}
+                      dot={{ fill: '#2D9065', strokeWidth: 2, r: 3 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Seller Performance - Takes 1/3 of width on xl screens */}
+        <div className="xl:col-span-1">
+          {dateRange?.from && dateRange?.to && (
+            <SellerPerformanceCard
+              campaignId={campaignData.id}
+              startDate={dateRange.from}
+              endDate={dateRange.to}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 };

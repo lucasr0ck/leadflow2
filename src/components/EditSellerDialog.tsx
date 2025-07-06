@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 
 const sellerSchema = z.object({
   name: z.string().min(1, 'Nome do vendedor é obrigatório'),
@@ -45,6 +45,9 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
   const { user } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<{ id: string; index: number } | null>(null);
+  const [isDeletingContact, setIsDeletingContact] = useState(false);
 
   const form = useForm<SellerFormData>({
     resolver: zodResolver(sellerSchema),
@@ -74,6 +77,57 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
     }
   }, [seller, open, form]);
 
+  const handleDeleteContact = (contactId: string, index: number) => {
+    setContactToDelete({ id: contactId, index });
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteContact = async () => {
+    if (!contactToDelete || !user) return;
+
+    try {
+      setIsDeletingContact(true);
+
+      // Use the new database function for safe deletion
+      const { data, error } = await supabase.rpc('delete_seller_contact', {
+        contact_id: contactToDelete.id
+      });
+
+      if (error || !data?.success) {
+        toast({
+          title: "Erro",
+          description: data?.error || "Não foi possível remover o contato.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Show success message with details
+      const linksDeleted = data.deleted_links_count || 0;
+      toast({
+        title: "Sucesso",
+        description: `Contato removido com sucesso${linksDeleted > 0 ? ` (${linksDeleted} links de campanha também foram removidos)` : ''}.`,
+      });
+
+      // Remove from form array
+      remove(contactToDelete.index);
+      setDeleteConfirmOpen(false);
+      setContactToDelete(null);
+
+      // Refresh the parent component
+      onSellerUpdated();
+    } catch (error) {
+      console.error('Error deleting contact:', error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao remover contato.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingContact(false);
+    }
+  };
+
   const onSubmit = async (data: SellerFormData) => {
     if (!user || !seller) return;
 
@@ -98,22 +152,6 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
       // Get existing contacts to determine which to update/delete/create
       const existingContacts = seller.contacts;
       const newContacts = data.contacts;
-
-      // Delete contacts that are no longer present
-      const contactsToDelete = existingContacts.filter(
-        existing => !newContacts.find(newContact => newContact.id === existing.id)
-      );
-
-      if (contactsToDelete.length > 0) {
-        const { error: deleteError } = await supabase
-          .from('seller_contacts')
-          .delete()
-          .in('id', contactsToDelete.map(c => c.id));
-
-        if (deleteError) {
-          console.error('Error deleting contacts:', deleteError);
-        }
-      }
 
       // Update existing contacts and create new ones
       for (const contact of newContacts) {
@@ -166,122 +204,142 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Editar Vendedor</DialogTitle>
-        </DialogHeader>
-        
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome do Vendedor</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="Ex: João Silva"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Vendedor</DialogTitle>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome do Vendedor</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Ex: João Silva"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <FormLabel>Contatos</FormLabel>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <FormLabel>Contatos</FormLabel>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => append({ phone_number: '', description: '' })}
+                    disabled={isSubmitting}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Adicionar Contato
+                  </Button>
+                </div>
+
+                {fields.map((field, index) => (
+                  <div key={field.id} className="p-4 border rounded-lg space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium">Contato {index + 1}</h4>
+                      {fields.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const contactData = form.getValues(`contacts.${index}`);
+                            if (contactData.id) {
+                              handleDeleteContact(contactData.id, index);
+                            } else {
+                              remove(index);
+                            }
+                          }}
+                          className="text-red-600 hover:text-red-700"
+                          disabled={isSubmitting}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name={`contacts.${index}.phone_number`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Número de Contato</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Ex: 5511999998888"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name={`contacts.${index}.description`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Descrição (Opcional)</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Ex: WhatsApp pessoal"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-4">
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
-                  onClick={() => append({ phone_number: '', description: '' })}
+                  onClick={() => onOpenChange(false)}
                   disabled={isSubmitting}
+                  className="flex-1"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Adicionar Contato
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1"
+                >
+                  {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}
                 </Button>
               </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
-              {fields.map((field, index) => (
-                <div key={field.id} className="p-4 border rounded-lg space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Contato {index + 1}</h4>
-                    {fields.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => remove(index)}
-                        className="text-red-600 hover:text-red-700"
-                        disabled={isSubmitting}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name={`contacts.${index}.phone_number`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Número de Contato</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="Ex: 5511999998888"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name={`contacts.${index}.description`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Descrição (Opcional)</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Ex: WhatsApp pessoal"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={isSubmitting}
-                className="flex-1"
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="flex-1"
-              >
-                {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+      <ConfirmationDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Confirmar Exclusão do Contato"
+        description="Tem certeza que deseja excluir este contato? Esta ação também removerá todos os links de campanha associados e não pode ser desfeita."
+        onConfirm={confirmDeleteContact}
+        confirmText={isDeletingContact ? "Excluindo..." : "Excluir"}
+        cancelText="Cancelar"
+        variant="destructive"
+      />
+    </>
   );
 };
