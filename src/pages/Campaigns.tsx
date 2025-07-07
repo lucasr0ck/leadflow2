@@ -8,6 +8,7 @@ import { CampaignCard } from '@/components/campaigns/CampaignCard';
 import { Button } from '@/components/ui/button';
 import { subDays, startOfDay } from 'date-fns';
 import { performDataCleanup } from '@/utils/dataCleanup';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 interface Campaign {
   id: string;
@@ -132,16 +133,14 @@ export const Campaigns = () => {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">Campanhas</h1>
-            <p className="text-sm lg:text-base text-slate-600 mt-1">Gerencie suas campanhas de distribuição de leads</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+      <div className="space-y-8">
+        <PageHeader
+          title="Campanhas"
+          description="Gerencie suas campanhas de distribuição de leads"
+        />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-64 bg-slate-100 animate-pulse rounded-lg" />
+            <div key={i} className="h-64 bg-muted/20 animate-pulse rounded-lg" />
           ))}
         </div>
       </div>
@@ -149,23 +148,23 @@ export const Campaigns = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">Campanhas</h1>
-          <p className="text-sm lg:text-base text-slate-600 mt-1">Gerencie suas campanhas de distribuição de leads</p>
-        </div>
-        <Button asChild className="sm:w-auto">
-          <Link to="/campaigns/new">
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Campanha
-          </Link>
-        </Button>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="Campanhas"
+        description="Gerencie suas campanhas de distribuição de leads"
+        actions={
+          <Button asChild className="sm:w-auto">
+            <Link to="/campaigns/new">
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Campanha
+            </Link>
+          </Button>
+        }
+      />
 
       {campaigns.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-slate-500 mb-4">Nenhuma campanha encontrada</p>
+          <p className="text-muted-foreground mb-4">Nenhuma campanha encontrada</p>
           <Button asChild>
             <Link to="/campaigns/new">
               <Plus className="w-4 h-4 mr-2" />
@@ -174,7 +173,7 @@ export const Campaigns = () => {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {campaigns.map((campaign) => (
             <CampaignCard 
               key={campaign.id} 

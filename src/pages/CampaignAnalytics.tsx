@@ -12,6 +12,7 @@ import { format, subDays, startOfDay, endOfDay, differenceInDays } from 'date-fn
 import { DateRange } from 'react-day-picker';
 import { BackButton } from '@/components/BackButton';
 import { SellerPerformanceCard } from '@/components/analytics/SellerPerformanceCard';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 interface CampaignData {
   id: string;
@@ -119,22 +120,22 @@ export const CampaignAnalytics = () => {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex items-center gap-4">
           <BackButton />
-          <div className="h-8 w-48 bg-slate-200 animate-pulse rounded" />
+          <div className="h-8 w-48 bg-muted animate-pulse rounded" />
         </div>
         
         {/* KPI Cards Loading */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-          <div className="h-32 bg-slate-100 animate-pulse rounded-lg" />
-          <div className="h-32 bg-slate-100 animate-pulse rounded-lg" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="h-32 bg-muted/20 animate-pulse rounded-lg" />
+          <div className="h-32 bg-muted/20 animate-pulse rounded-lg" />
         </div>
         
         {/* Main Content Loading */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-2 h-80 bg-slate-100 animate-pulse rounded-lg" />
-          <div className="h-80 bg-slate-100 animate-pulse rounded-lg" />
+          <div className="xl:col-span-2 h-80 bg-muted/20 animate-pulse rounded-lg" />
+          <div className="h-80 bg-muted/20 animate-pulse rounded-lg" />
         </div>
       </div>
     );
@@ -142,24 +143,27 @@ export const CampaignAnalytics = () => {
 
   if (!campaignData) {
     return (
-      <div className="space-y-6">
-        <BackButton />
+      <div className="space-y-8">
+        <div className="flex items-center gap-4">
+          <BackButton />
+        </div>
         <div className="text-center py-12">
-          <p className="text-slate-500">Campanha não encontrada</p>
+          <p className="text-muted-foreground">Campanha não encontrada</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 pb-2">
+      <div className="flex items-center gap-4">
         <BackButton />
-        <div className="flex-1">
-          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">{campaignData.name}</h1>
-          <p className="text-sm lg:text-base text-muted-foreground">Analytics detalhado da campanha</p>
-        </div>
+        <PageHeader
+          title={campaignData.name}
+          description="Analytics detalhado da campanha"
+          className="border-0 pb-0"
+        />
       </div>
 
       {/* Date Range Picker */}
@@ -214,7 +218,7 @@ export const CampaignAnalytics = () => {
       </div>
 
       {/* KPI Cards - Full width, side by side on desktop */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="text-xs lg:text-sm">Total de Cliques (período)</CardDescription>

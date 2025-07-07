@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { EditSellerDialog } from '@/components/EditSellerDialog';
 import { ConfirmationDialog } from '@/components/ConfirmationDialog';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 interface Seller {
   id: string;
@@ -150,16 +151,14 @@ export const Sellers = () => {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">Vendedores</h1>
-            <p className="text-sm lg:text-base text-slate-600 mt-1">Gerencie sua equipe de vendas</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+      <div className="space-y-8">
+        <PageHeader
+          title="Vendedores"
+          description="Gerencie sua equipe de vendas"
+        />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-48 bg-slate-100 animate-pulse rounded-lg" />
+            <div key={i} className="h-48 bg-muted/20 animate-pulse rounded-lg" />
           ))}
         </div>
       </div>
@@ -167,23 +166,23 @@ export const Sellers = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">Vendedores</h1>
-          <p className="text-sm lg:text-base text-slate-600 mt-1">Gerencie sua equipe de vendas</p>
-        </div>
-        <Button asChild className="sm:w-auto">
-          <Link to="/sellers/new">
-            <Plus className="w-4 h-4 mr-2" />
-            Novo Vendedor
-          </Link>
-        </Button>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="Vendedores"
+        description="Gerencie sua equipe de vendas"
+        actions={
+          <Button asChild className="sm:w-auto">
+            <Link to="/sellers/new">
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Vendedor
+            </Link>
+          </Button>
+        }
+      />
 
       {sellers.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-slate-500 mb-4">Nenhum vendedor encontrado</p>
+          <p className="text-muted-foreground mb-4">Nenhum vendedor encontrado</p>
           <Button asChild>
             <Link to="/sellers/new">
               <Plus className="w-4 h-4 mr-2" />
@@ -192,12 +191,12 @@ export const Sellers = () => {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {sellers.map((seller) => (
             <Card key={seller.id} className="h-full">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-semibold text-slate-800 truncate">
+                  <CardTitle className="text-lg font-semibold text-foreground truncate">
                     {seller.name}
                   </CardTitle>
                   <div className="flex gap-1 shrink-0">
@@ -226,7 +225,7 @@ export const Sellers = () => {
               <CardContent className="space-y-4">
                 {/* Contact Count */}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-600">Contatos:</span>
+                  <span className="text-sm text-muted-foreground">Contatos:</span>
                   <Badge variant="secondary" className="text-xs">
                     {seller.contacts?.length || 0}
                   </Badge>
@@ -235,15 +234,15 @@ export const Sellers = () => {
                 {/* Contacts List */}
                 {seller.contacts && seller.contacts.length > 0 ? (
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-slate-600">Números de Contato:</p>
+                    <p className="text-xs font-medium text-muted-foreground">Números de Contato:</p>
                     <div className="space-y-1 max-h-32 overflow-y-auto">
                       {seller.contacts.map((contact) => (
-                        <div key={contact.id} className="p-2 bg-slate-50 rounded text-xs">
-                          <p className="font-mono text-slate-700 truncate">
+                        <div key={contact.id} className="p-2 bg-muted/50 rounded text-xs">
+                          <p className="font-mono text-foreground truncate">
                             {contact.phone_number}
                           </p>
                           {contact.description && (
-                            <p className="text-slate-500 mt-1 truncate">
+                            <p className="text-muted-foreground mt-1 truncate">
                               {contact.description}
                             </p>
                           )}
@@ -252,7 +251,7 @@ export const Sellers = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-4 text-slate-500 text-sm">
+                  <div className="text-center py-4 text-muted-foreground text-sm">
                     Nenhum contato cadastrado
                   </div>
                 )}
