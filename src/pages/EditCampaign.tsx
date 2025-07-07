@@ -13,8 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { BackButton } from '@/components/BackButton';
-import { Badge } from '@/components/ui/badge';
-import { Plus, X } from 'lucide-react';
+import { SellerRotationManager } from '@/components/campaigns/SellerRotationManager';
 
 const campaignSchema = z.object({
   name: z.string().min(1, 'Nome da campanha é obrigatório'),
@@ -24,14 +23,10 @@ const campaignSchema = z.object({
 
 type CampaignFormData = z.infer<typeof campaignSchema>;
 
-interface Seller {
-  id: string;
-  name: string;
-  contacts: Array<{
-    id: string;
-    phone_number: string;
-    description?: string;
-  }>;
+interface RotationEntry {
+  sellerId: string;
+  sellerName: string;
+  repetitions: number;
 }
 
 interface CampaignLink {
@@ -56,13 +51,7 @@ export const EditCampaign = () => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [sellers, setSellers] = useState<Seller[]>([]);
-  const [selectedContacts, setSelectedContacts] = useState<Array<{
-    contactId: string;
-    sellerName: string;
-    phoneNumber: string;
-    description?: string;
-  }>>([]);
+  const [rotation, setRotation] = useState<RotationEntry[]>([]);
 
   const form = useForm<CampaignFormData>({
     resolver: zodResolver(campaignSchema),
@@ -142,37 +131,28 @@ export const EditCampaign = () => {
       form.setValue('slug', campaign.slug);
       form.setValue('greeting_message', campaign.greeting_message || '');
 
-      // Set selected contacts from campaign links
+      // Convert campaign links to rotation entries
       const campaignLinks = campaign.campaign_links as CampaignLink[];
-      const contacts = campaignLinks.map(link => ({
-        contactId: link.seller_contacts.id,
-        sellerName: link.seller_contacts.sellers.name,
-        phoneNumber: link.seller_contacts.phone_number,
-        description: link.seller_contacts.description,
+      const sellerCounts: { [sellerId: string]: { name: string; count: number } } = {};
+      
+      campaignLinks.forEach(link => {
+        const sellerId = link.seller_contacts.sellers.id;
+        const sellerName = link.seller_contacts.sellers.name;
+        
+        if (sellerCounts[sellerId]) {
+          sellerCounts[sellerId].count++;
+        } else {
+          sellerCounts[sellerId] = { name: sellerName, count: 1 };
+        }
+      });
+
+      const rotationEntries: RotationEntry[] = Object.entries(sellerCounts).map(([sellerId, data]) => ({
+        sellerId,
+        sellerName: data.name,
+        repetitions: data.count,
       }));
-      setSelectedContacts(contacts);
 
-      // Fetch all available sellers and their contacts
-      const { data: sellersData } = await supabase
-        .from('sellers')
-        .select(`
-          id,
-          name,
-          seller_contacts (
-            id,
-            phone_number,
-            description
-          )
-        `)
-        .eq('team_id', team.id)
-        .order('name');
-
-      const mappedSellers = sellersData?.map(seller => ({
-        ...seller,
-        contacts: seller.seller_contacts || []
-      })) || [];
-
-      setSellers(mappedSellers);
+      setRotation(rotationEntries);
     } catch (error) {
       console.error('Error fetching campaign data:', error);
       toast({
@@ -186,36 +166,14 @@ export const EditCampaign = () => {
     }
   };
 
-  const addContactToRotation = (contact: { id: string; phone_number: string; description?: string }, sellerName: string) => {
-    const isAlreadySelected = selectedContacts.some(c => c.contactId === contact.id);
-    if (isAlreadySelected) {
-      toast({
-        title: "Aviso",
-        description: "Este contato já está na rotação.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setSelectedContacts(prev => [...prev, {
-      contactId: contact.id,
-      sellerName,
-      phoneNumber: contact.phone_number,
-      description: contact.description,
-    }]);
-  };
-
-  const removeContactFromRotation = (contactId: string) => {
-    setSelectedContacts(prev => prev.filter(c => c.contactId !== contactId));
-  };
 
   const onSubmit = async (data: CampaignFormData) => {
     if (!user || !id) return;
 
-    if (selectedContacts.length === 0) {
+    if (rotation.length === 0) {
       toast({
         title: "Erro",
-        description: "Selecione pelo menos um contato para a rotação.",
+        description: "Adicione pelo menos um vendedor à rotação.",
         variant: "destructive",
       });
       return;
@@ -275,24 +233,47 @@ export const EditCampaign = () => {
         return;
       }
 
-      // Create new campaign links
-      const campaignLinks = selectedContacts.map((contact, index) => ({
-        campaign_id: id,
-        contact_id: contact.contactId,
-        position: index + 1,
-      }));
+      // Create new campaign links based on rotation
+      const campaignLinks: Array<{
+        campaign_id: string;
+        contact_id: string;
+        position: number;
+      }> = [];
 
-      const { error: linksError } = await supabase
-        .from('campaign_links')
-        .insert(campaignLinks);
+      let position = 1;
+      for (const entry of rotation) {
+        // Get seller's first contact
+        const { data: contacts } = await supabase
+          .from('seller_contacts')
+          .select('id')
+          .eq('seller_id', entry.sellerId)
+          .limit(1);
 
-      if (linksError) {
-        toast({
-          title: "Erro",
-          description: "Erro ao criar rotação.",
-          variant: "destructive",
-        });
-        return;
+        if (contacts && contacts.length > 0) {
+          // Add each repetition for this seller
+          for (let i = 0; i < entry.repetitions; i++) {
+            campaignLinks.push({
+              campaign_id: id!,
+              contact_id: contacts[0].id,
+              position: position++,
+            });
+          }
+        }
+      }
+
+      if (campaignLinks.length > 0) {
+        const { error: linksError } = await supabase
+          .from('campaign_links')
+          .insert(campaignLinks);
+
+        if (linksError) {
+          toast({
+            title: "Erro",
+            description: "Erro ao criar rotação.",
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
       toast({
@@ -396,80 +377,11 @@ export const EditCampaign = () => {
                 )}
               />
 
-              {/* Rotation Section */}
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Rotação de Vendedores</h3>
-                  <p className="text-sm text-slate-600 mb-4">
-                    Selecione os contatos que participarão da rotação desta campanha.
-                  </p>
-                </div>
-
-                {/* Selected Contacts */}
-                {selectedContacts.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-sm">Contatos Selecionados ({selectedContacts.length}):</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedContacts.map((contact, index) => (
-                        <Badge key={contact.contactId} variant="default" className="px-3 py-1">
-                          <span className="mr-2">
-                            {index + 1}. {contact.sellerName} - {contact.phoneNumber}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => removeContactFromRotation(contact.contactId)}
-                            className="ml-1 hover:bg-red-600 rounded-full p-0.5"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Available Sellers */}
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm">Vendedores Disponíveis:</h4>
-                  {sellers.length === 0 ? (
-                    <p className="text-sm text-slate-500">
-                      Nenhum vendedor encontrado. 
-                      <a href="/sellers/new" className="text-blue-600 hover:underline ml-1">
-                        Adicionar vendedor
-                      </a>
-                    </p>
-                  ) : (
-                    <div className="grid gap-3">
-                      {sellers.map((seller) => (
-                        <Card key={seller.id} className="p-3">
-                          <div className="font-medium text-sm mb-2">{seller.name}</div>
-                          {seller.contacts.length === 0 ? (
-                            <p className="text-sm text-slate-500">Nenhum contato cadastrado</p>
-                          ) : (
-                            <div className="flex flex-wrap gap-2">
-                              {seller.contacts.map((contact) => (
-                                <Button
-                                  key={contact.id}
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => addContactToRotation(contact, seller.name)}
-                                  className="text-xs"
-                                  disabled={selectedContacts.some(c => c.contactId === contact.id)}
-                                >
-                                  <Plus className="w-3 h-3 mr-1" />
-                                  {contact.phone_number}
-                                  {contact.description && ` (${contact.description})`}
-                                </Button>
-                              ))}
-                            </div>
-                          )}
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+              {/* Seller Rotation Section */}
+              <SellerRotationManager 
+                rotation={rotation}
+                onRotationChange={setRotation}
+              />
 
               <div className="flex gap-4">
                 <Button
@@ -483,7 +395,7 @@ export const EditCampaign = () => {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || rotation.length === 0}
                   className="flex-1"
                 >
                   {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}

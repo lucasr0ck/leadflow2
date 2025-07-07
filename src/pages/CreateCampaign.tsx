@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { BackButton } from '@/components/BackButton';
+import { SellerRotationManager } from '@/components/campaigns/SellerRotationManager';
 
 const campaignSchema = z.object({
   name: z.string().min(1, 'Nome da campanha é obrigatório'),
@@ -22,11 +23,18 @@ const campaignSchema = z.object({
 
 type CampaignFormData = z.infer<typeof campaignSchema>;
 
+interface RotationEntry {
+  sellerId: string;
+  sellerName: string;
+  repetitions: number;
+}
+
 export const CreateCampaign = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rotation, setRotation] = useState<RotationEntry[]>([]);
 
   const form = useForm<CampaignFormData>({
     resolver: zodResolver(campaignSchema),
@@ -39,6 +47,15 @@ export const CreateCampaign = () => {
 
   const onSubmit = async (data: CampaignFormData) => {
     if (!user) return;
+
+    if (rotation.length === 0) {
+      toast({
+        title: "Erro",
+        description: "Adicione pelo menos um vendedor à rotação.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -79,6 +96,49 @@ export const CreateCampaign = () => {
           variant: "destructive",
         });
         return;
+      }
+
+      // Create campaign links based on rotation
+      const campaignLinks: Array<{
+        campaign_id: string;
+        contact_id: string;
+        position: number;
+      }> = [];
+
+      let position = 1;
+      for (const entry of rotation) {
+        // Get seller's contacts
+        const { data: contacts } = await supabase
+          .from('seller_contacts')
+          .select('id')
+          .eq('seller_id', entry.sellerId);
+
+        if (contacts && contacts.length > 0) {
+          // Add each repetition for this seller
+          for (let i = 0; i < entry.repetitions; i++) {
+            // Use the first contact for each seller
+            campaignLinks.push({
+              campaign_id: campaign.id,
+              contact_id: contacts[0].id,
+              position: position++,
+            });
+          }
+        }
+      }
+
+      if (campaignLinks.length > 0) {
+        const { error: linksError } = await supabase
+          .from('campaign_links')
+          .insert(campaignLinks);
+
+        if (linksError) {
+          toast({
+            title: "Erro",
+            description: "Campanha criada, mas erro ao configurar rotação.",
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
       toast({
@@ -168,6 +228,12 @@ export const CreateCampaign = () => {
                 )}
               />
 
+              {/* Seller Rotation Section */}
+              <SellerRotationManager 
+                rotation={rotation}
+                onRotationChange={setRotation}
+              />
+
               <div className="flex gap-4">
                 <Button
                   type="button"
@@ -180,7 +246,7 @@ export const CreateCampaign = () => {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || rotation.length === 0}
                   className="flex-1"
                 >
                   {isSubmitting ? 'Criando...' : 'Criar Campanha'}
