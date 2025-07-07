@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Progress } from '@/components/ui/progress';
 import { Users } from 'lucide-react';
 
 interface SellerPerformanceData {
@@ -87,6 +89,8 @@ export const SellerPerformanceCard = ({ campaignId, startDate, endDate }: Seller
     fetchSellerPerformance();
   }, [campaignId, startDate, endDate]);
 
+  const totalClicks = sellerData.reduce((sum, seller) => sum + seller.click_count, 0);
+
   if (loading) {
     return (
       <Card className="h-full">
@@ -98,8 +102,8 @@ export const SellerPerformanceCard = ({ campaignId, startDate, endDate }: Seller
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-16 bg-slate-100 animate-pulse rounded" />
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-12 bg-muted/20 animate-pulse rounded" />
             ))}
           </div>
         </CardContent>
@@ -115,43 +119,76 @@ export const SellerPerformanceCard = ({ campaignId, startDate, endDate }: Seller
           Top Performers
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         {sellerData.length === 0 ? (
-          <div className="text-center py-8 text-slate-500">
+          <div className="text-center py-8 text-muted-foreground p-6">
             <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">Nenhum clique registrado no período</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {sellerData.map((seller, index) => (
-              <div key={`${seller.seller_name}-${seller.contact_phone}`} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="outline" className="text-xs">
-                      #{index + 1}
-                    </Badge>
-                    <p className="font-medium text-sm text-slate-800 truncate">
-                      {seller.seller_name}
-                    </p>
-                  </div>
-                  <p className="text-xs text-slate-600 truncate font-mono">
-                    {seller.contact_phone}
-                  </p>
-                  {seller.contact_description && (
-                    <p className="text-xs text-slate-500 truncate mt-1">
-                      {seller.contact_description}
-                    </p>
-                  )}
-                </div>
-                <div className="text-right">
-                  <Badge variant="secondary" className="font-bold">
-                    {seller.click_count}
-                  </Badge>
-                  <p className="text-xs text-slate-500 mt-1">cliques</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-16">Posição</TableHead>
+                <TableHead>Vendedor</TableHead>
+                <TableHead className="text-center w-20">Cliques</TableHead>
+                <TableHead className="text-center w-28">Distribuição</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sellerData.map((seller, index) => {
+                const percentage = totalClicks > 0 ? (seller.click_count / totalClicks) * 100 : 0;
+                const maxClicks = Math.max(...sellerData.map(s => s.click_count));
+                const barWidth = maxClicks > 0 ? (seller.click_count / maxClicks) * 100 : 0;
+                
+                return (
+                  <TableRow key={`${seller.seller_name}-${seller.contact_phone}`}>
+                    <TableCell>
+                      <Badge variant={index === 0 ? "default" : "outline"} className="font-bold">
+                        #{index + 1}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <p className="font-medium text-foreground">
+                          {seller.seller_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {seller.contact_phone}
+                        </p>
+                        {seller.contact_description && (
+                          <p className="text-xs text-muted-foreground/70 truncate">
+                            {seller.contact_description}
+                          </p>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="space-y-2">
+                        <div className="font-bold text-foreground">
+                          {seller.click_count}
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-1.5">
+                          <div 
+                            className="bg-primary h-1.5 rounded-full transition-all duration-300" 
+                            style={{ width: `${barWidth}%` }}
+                          />
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="space-y-1">
+                        <div className="font-bold text-foreground">
+                          {percentage.toFixed(1)}%
+                        </div>
+                        <Progress value={percentage} className="h-1.5" />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         )}
       </CardContent>
     </Card>

@@ -154,11 +154,11 @@ export const CampaignAnalytics = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 pb-2">
         <BackButton />
         <div className="flex-1">
-          <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">{campaignData.name}</h1>
-          <p className="text-sm lg:text-base text-slate-600">Analytics detalhado da campanha</p>
+          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">{campaignData.name}</h1>
+          <p className="text-sm lg:text-base text-muted-foreground">Analytics detalhado da campanha</p>
         </div>
       </div>
 
@@ -220,7 +220,7 @@ export const CampaignAnalytics = () => {
             <CardDescription className="text-xs lg:text-sm">Total de Cliques (período)</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl lg:text-3xl font-bold text-slate-800">{campaignData.totalClicks}</div>
+            <div className="text-2xl lg:text-3xl font-bold text-foreground">{campaignData.totalClicks}</div>
           </CardContent>
         </Card>
         <Card>
@@ -228,7 +228,7 @@ export const CampaignAnalytics = () => {
             <CardDescription className="text-xs lg:text-sm">Média Diária de Cliques</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl lg:text-3xl font-bold text-slate-800">{campaignData.averageDailyClicks}</div>
+            <div className="text-2xl lg:text-3xl font-bold text-foreground">{campaignData.averageDailyClicks}</div>
           </CardContent>
         </Card>
       </div>
@@ -260,11 +260,24 @@ export const CampaignAnalytics = () => {
                     />
                     <Tooltip 
                       contentStyle={{
-                        backgroundColor: 'white',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '6px',
-                        fontSize: '12px',
+                        backgroundColor: 'hsl(var(--background))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        color: 'hsl(var(--foreground))',
+                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+                        padding: '12px',
                       }}
+                      labelStyle={{
+                        color: 'hsl(var(--muted-foreground))',
+                        fontSize: '12px',
+                        marginBottom: '4px',
+                      }}
+                      formatter={(value: any, name: string) => [
+                        <span style={{ color: 'hsl(142 71% 45%)', fontWeight: 'bold' }}>{value} cliques</span>, 
+                        ''
+                      ]}
+                      labelFormatter={(label: string) => `Data: ${label}`}
                     />
                     <Line 
                       type="monotone" 
