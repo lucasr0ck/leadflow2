@@ -37,8 +37,8 @@ export const Login = () => {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left Column - Branding Side */}
-      <div className="flex-1 bg-gradient-to-br from-slate-900 via-[#2D9065] to-slate-800 relative overflow-hidden flex flex-col justify-between p-12">
+      {/* Left Column - Branding Side - Hidden on mobile (< md) */}
+      <div className="hidden md:flex flex-1 bg-gradient-to-br from-slate-900 via-[#2D9065] to-slate-800 relative overflow-hidden flex-col justify-between p-12">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
@@ -73,8 +73,8 @@ export const Login = () => {
         </div>
       </div>
 
-      {/* Right Column - Action Side */}
-      <div className="flex-1 bg-slate-50 flex items-center justify-center p-8">
+      {/* Right Column - Action Side - Full width on mobile, half width on desktop */}
+      <div className="flex-1 md:flex-1 w-full bg-slate-50 flex items-center justify-center p-4 md:p-8">
         {/* Login Form Card with Animation */}
         <Card className="w-full max-w-md bg-white shadow-2xl border-0 ring-1 ring-slate-200/50 animate-fade-in">
           <CardHeader className="text-center space-y-4 pb-6 pt-8">
@@ -88,7 +88,7 @@ export const Login = () => {
             </div>
           </CardHeader>
 
-          <CardContent className="space-y-6 px-8 pb-8">
+          <CardContent className="space-y-6 px-6 md:px-8 pb-8">
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-slate-700 font-medium">
