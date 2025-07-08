@@ -218,62 +218,25 @@ export const EditCampaign = () => {
         return;
       }
 
-      // Delete existing campaign links
-      const { error: deleteError } = await supabase
-        .from('campaign_links')
-        .delete()
-        .eq('campaign_id', id);
+      // Create fair campaign distribution using the new database function
+      const sellerRepetitions = rotation.map(entry => ({
+        seller_id: entry.sellerId,
+        repetitions: entry.repetitions
+      }));
 
-      if (deleteError) {
+      const { data: distributionResult, error: distributionError } = await supabase
+        .rpc('create_campaign_distribution', {
+          campaign_id_param: id!,
+          seller_repetitions: sellerRepetitions
+        });
+
+      if (distributionError || !distributionResult?.[0]?.success) {
         toast({
           title: "Erro",
           description: "Erro ao atualizar rotação.",
           variant: "destructive",
         });
         return;
-      }
-
-      // Create new campaign links based on rotation
-      const campaignLinks: Array<{
-        campaign_id: string;
-        contact_id: string;
-        position: number;
-      }> = [];
-
-      let position = 1;
-      for (const entry of rotation) {
-        // Get seller's first contact
-        const { data: contacts } = await supabase
-          .from('seller_contacts')
-          .select('id')
-          .eq('seller_id', entry.sellerId)
-          .limit(1);
-
-        if (contacts && contacts.length > 0) {
-          // Add each repetition for this seller
-          for (let i = 0; i < entry.repetitions; i++) {
-            campaignLinks.push({
-              campaign_id: id!,
-              contact_id: contacts[0].id,
-              position: position++,
-            });
-          }
-        }
-      }
-
-      if (campaignLinks.length > 0) {
-        const { error: linksError } = await supabase
-          .from('campaign_links')
-          .insert(campaignLinks);
-
-        if (linksError) {
-          toast({
-            title: "Erro",
-            description: "Erro ao criar rotação.",
-            variant: "destructive",
-          });
-          return;
-        }
       }
 
       toast({

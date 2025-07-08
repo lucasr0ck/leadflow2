@@ -221,6 +221,14 @@ export type Database = {
           message: string
         }[]
       }
+      create_campaign_distribution: {
+        Args: { campaign_id_param: string; seller_repetitions: Json }
+        Returns: {
+          success: boolean
+          total_links_created: number
+          message: string
+        }[]
+      }
       delete_campaign_and_children: {
         Args: { campaign_id_to_delete: string }
         Returns: {
