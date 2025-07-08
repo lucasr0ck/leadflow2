@@ -63,7 +63,6 @@ export const CampaignCard = ({ campaign, onCampaignDeleted }: CampaignCardProps)
   };
 
   const handleEditClick = (e: React.MouseEvent) => {
-    e.preventDefault();
     e.stopPropagation();
   };
 
