@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 
 export const Login = () => {
@@ -35,49 +36,80 @@ export const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-sm border border-slate-200">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-slate-800 mb-2">LeadFlow</h1>
-          <p className="text-slate-600">Sign in to your account</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="email">Team Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your team email"
-              required
-              className="mt-1"
-            />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 relative overflow-hidden">
+      {/* Subtle background pattern */}
+      <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23cbd5e1" fill-opacity="0.1"%3E%3Ccircle cx="30" cy="30" r="1"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-50"></div>
+      
+      {/* Main login card */}
+      <Card className="w-full max-w-md mx-4 backdrop-blur-sm bg-white/95 shadow-2xl border-0 ring-1 ring-slate-200/50">
+        <CardHeader className="text-center space-y-6 pb-8 pt-12">
+          {/* LeadFlow Brand */}
+          <div className="space-y-2">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-800 via-slate-700 to-slate-600 bg-clip-text text-transparent tracking-tight">
+              LeadFlow
+            </h1>
+            <p className="text-slate-600 font-medium">
+              Sign in to your account
+            </p>
           </div>
+        </CardHeader>
 
-          <div>
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              required
-              className="mt-1"
-            />
+        <CardContent className="space-y-6 px-8 pb-12">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-slate-700 font-medium">
+                Team Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your team email"
+                required
+                className="h-12 border-slate-200 focus:border-[#2D9065] focus:ring-[#2D9065] transition-colors"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-slate-700 font-medium">
+                Password
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+                className="h-12 border-slate-200 focus:border-[#2D9065] focus:ring-[#2D9065] transition-colors"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full h-12 bg-[#2D9065] hover:bg-[#2D9065]/90 font-semibold text-white shadow-lg shadow-[#2D9065]/20 transition-all duration-200 hover:shadow-xl hover:shadow-[#2D9065]/30"
+              disabled={loading}
+            >
+              {loading ? (
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <span>Signing in...</span>
+                </div>
+              ) : (
+                'Sign In'
+              )}
+            </Button>
+          </form>
+
+          {/* Subtle brand credit */}
+          <div className="text-center pt-6 border-t border-slate-100">
+            <p className="text-xs text-slate-400 font-medium tracking-wide">
+              by Multium Group
+            </p>
           </div>
-
-          <Button
-            type="submit"
-            className="w-full bg-[#2D9065] hover:bg-[#2D9065]/90"
-            disabled={loading}
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </Button>
-        </form>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
