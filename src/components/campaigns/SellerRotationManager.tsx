@@ -14,6 +14,7 @@ import { SellerRotationChart } from './SellerRotationChart';
 interface Seller {
   id: string;
   name: string;
+  contactCount?: number;
 }
 
 interface RotationEntry {
@@ -34,6 +35,7 @@ export const SellerRotationManager = ({ rotation, onRotationChange }: SellerRota
   const [selectedSellerId, setSelectedSellerId] = useState<string>('');
   const [repetitions, setRepetitions] = useState<number>(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [sellerContacts, setSellerContacts] = useState<{ [sellerId: string]: number }>({});
 
   useEffect(() => {
     if (user) {
@@ -54,14 +56,31 @@ export const SellerRotationManager = ({ rotation, onRotationChange }: SellerRota
 
       if (!team) return;
 
-      // Fetch sellers
+      // Fetch sellers with contact counts
       const { data: sellersData } = await supabase
         .from('sellers')
-        .select('id, name')
+        .select(`
+          id, 
+          name,
+          seller_contacts(count)
+        `)
         .eq('team_id', team.id)
         .order('name');
 
-      setSellers(sellersData || []);
+      // Process seller data and create contact count map
+      const processedSellers = sellersData?.map(seller => ({
+        id: seller.id,
+        name: seller.name,
+        contactCount: seller.seller_contacts?.[0]?.count || 0
+      })) || [];
+
+      const contactsMap: { [sellerId: string]: number } = {};
+      processedSellers.forEach(seller => {
+        contactsMap[seller.id] = seller.contactCount || 0;
+      });
+
+      setSellers(processedSellers);
+      setSellerContacts(contactsMap);
     } catch (error) {
       console.error('Error fetching sellers:', error);
       toast({
@@ -72,6 +91,12 @@ export const SellerRotationManager = ({ rotation, onRotationChange }: SellerRota
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Calculate total slots that will be added
+  const calculateTotalSlotsToAdd = () => {
+    if (!selectedSellerId || !sellerContacts[selectedSellerId]) return 0;
+    return sellerContacts[selectedSellerId] * repetitions;
   };
 
   const addToRotation = () => {
@@ -96,6 +121,16 @@ export const SellerRotationManager = ({ rotation, onRotationChange }: SellerRota
     const seller = sellers.find(s => s.id === selectedSellerId);
     if (!seller) return;
 
+    const contactCount = sellerContacts[selectedSellerId] || 0;
+    if (contactCount === 0) {
+      toast({
+        title: "Erro",
+        description: "Este vendedor não possui contatos. Adicione contatos antes de incluí-lo na rotação.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Check if seller is already in rotation
     const existingEntryIndex = rotation.findIndex(entry => entry.sellerId === selectedSellerId);
     
@@ -114,13 +149,15 @@ export const SellerRotationManager = ({ rotation, onRotationChange }: SellerRota
       onRotationChange([...rotation, newEntry]);
     }
 
+    const totalSlotsAdded = contactCount * repetitions;
+
     // Reset form
     setSelectedSellerId('');
     setRepetitions(1);
     
     toast({
       title: "Sucesso",
-      description: `${seller.name} adicionado à rotação com ${repetitions} repetições.`,
+      description: `${seller.name} adicionado à rotação. ${totalSlotsAdded} slots criados (${contactCount} contatos × ${repetitions} repetições).`,
     });
   };
 
@@ -173,11 +210,11 @@ export const SellerRotationManager = ({ rotation, onRotationChange }: SellerRota
                       Nenhum vendedor encontrado
                     </SelectItem>
                   ) : (
-                    sellers.map((seller) => (
-                      <SelectItem key={seller.id} value={seller.id}>
-                        {seller.name}
-                      </SelectItem>
-                    ))
+                   sellers.map((seller) => (
+                     <SelectItem key={seller.id} value={seller.id}>
+                       {seller.name} ({sellerContacts[seller.id] || 0} contatos)
+                     </SelectItem>
+                   ))
                   )}
                 </SelectContent>
               </Select>
@@ -204,6 +241,26 @@ export const SellerRotationManager = ({ rotation, onRotationChange }: SellerRota
               Adicionar
             </Button>
           </div>
+
+          {/* Real-time slot calculation feedback */}
+          {selectedSellerId && sellerContacts[selectedSellerId] !== undefined && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="text-sm text-blue-800">
+                <strong>Total de Slots a Adicionar: {calculateTotalSlotsToAdd()}</strong>
+              </div>
+              <div className="text-xs text-blue-600 mt-1">
+                {sellerContacts[selectedSellerId]} contatos × {repetitions} repetições = {calculateTotalSlotsToAdd()} slots
+              </div>
+            </div>
+          )}
+
+          {selectedSellerId && sellerContacts[selectedSellerId] === 0 && (
+            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="text-sm text-amber-800">
+                ⚠️ Este vendedor não possui contatos. Adicione contatos antes de incluí-lo na rotação.
+              </div>
+            </div>
+          )}
 
           {sellers.length === 0 && (
             <p className="text-sm text-muted-foreground mt-4">
