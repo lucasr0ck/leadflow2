@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -13,7 +12,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { BackButton } from '@/components/BackButton';
-import { SellerRotationManager } from '@/components/campaigns/SellerRotationManager';
 
 const campaignSchema = z.object({
   name: z.string().min(1, 'Nome da campanha é obrigatório'),
@@ -23,27 +21,6 @@ const campaignSchema = z.object({
 
 type CampaignFormData = z.infer<typeof campaignSchema>;
 
-interface RotationEntry {
-  sellerId: string;
-  sellerName: string;
-  repetitions: number;
-}
-
-interface CampaignLink {
-  id: string;
-  position: number;
-  contact_id: string;
-  seller_contacts: {
-    id: string;
-    phone_number: string;
-    description?: string;
-    sellers: {
-      id: string;
-      name: string;
-    };
-  };
-}
-
 export const EditCampaign = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -51,7 +28,6 @@ export const EditCampaign = () => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [rotation, setRotation] = useState<RotationEntry[]>([]);
 
   const form = useForm<CampaignFormData>({
     resolver: zodResolver(campaignSchema),
@@ -92,26 +68,7 @@ export const EditCampaign = () => {
       // Fetch campaign data
       const { data: campaign, error: campaignError } = await supabase
         .from('campaigns')
-        .select(`
-          id,
-          name,
-          slug,
-          greeting_message,
-          campaign_links (
-            id,
-            position,
-            contact_id,
-            seller_contacts (
-              id,
-              phone_number,
-              description,
-              sellers (
-                id,
-                name
-              )
-            )
-          )
-        `)
+        .select('id, name, slug, greeting_message')
         .eq('id', id)
         .eq('team_id', team.id)
         .single();
@@ -130,29 +87,6 @@ export const EditCampaign = () => {
       form.setValue('name', campaign.name);
       form.setValue('slug', campaign.slug);
       form.setValue('greeting_message', campaign.greeting_message || '');
-
-      // Convert campaign links to rotation entries
-      const campaignLinks = campaign.campaign_links as CampaignLink[];
-      const sellerCounts: { [sellerId: string]: { name: string; count: number } } = {};
-      
-      campaignLinks.forEach(link => {
-        const sellerId = link.seller_contacts.sellers.id;
-        const sellerName = link.seller_contacts.sellers.name;
-        
-        if (sellerCounts[sellerId]) {
-          sellerCounts[sellerId].count++;
-        } else {
-          sellerCounts[sellerId] = { name: sellerName, count: 1 };
-        }
-      });
-
-      const rotationEntries: RotationEntry[] = Object.entries(sellerCounts).map(([sellerId, data]) => ({
-        sellerId,
-        sellerName: data.name,
-        repetitions: data.count,
-      }));
-
-      setRotation(rotationEntries);
     } catch (error) {
       console.error('Error fetching campaign data:', error);
       toast({
@@ -166,18 +100,8 @@ export const EditCampaign = () => {
     }
   };
 
-
   const onSubmit = async (data: CampaignFormData) => {
     if (!user || !id) return;
-
-    if (rotation.length === 0) {
-      toast({
-        title: "Erro",
-        description: "Adicione pelo menos um vendedor à rotação.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     try {
       setIsSubmitting(true);
@@ -213,27 +137,6 @@ export const EditCampaign = () => {
         toast({
           title: "Erro",
           description: "Não foi possível atualizar a campanha.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Create fair campaign distribution using the new database function
-      const sellerRepetitions = rotation.map(entry => ({
-        seller_id: entry.sellerId,
-        repetitions: entry.repetitions
-      }));
-
-      const { data: distributionResult, error: distributionError } = await supabase
-        .rpc('create_campaign_distribution', {
-          campaign_id_param: id!,
-          seller_repetitions: sellerRepetitions
-        });
-
-      if (distributionError || !distributionResult?.[0]?.success) {
-        toast({
-          title: "Erro",
-          description: "Erro ao atualizar rotação.",
           variant: "destructive",
         });
         return;
@@ -340,11 +243,17 @@ export const EditCampaign = () => {
                 )}
               />
 
-              {/* Seller Rotation Section */}
-              <SellerRotationManager 
-                rotation={rotation}
-                onRotationChange={setRotation}
-              />
+              {/* Lead Distribution Info */}
+              <div className="p-4 bg-muted/30 rounded-lg border">
+                <h3 className="font-medium text-foreground mb-2">Distribuição Automática de Leads</h3>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Os leads desta campanha são distribuídos automaticamente entre todos os vendedores ativos do seu time, 
+                  respeitando os pesos configurados na página de vendedores.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  💡 Para configurar a distribuição, vá para a página "Vendedores" e ajuste o peso de cada vendedor.
+                </p>
+              </div>
 
               <div className="flex gap-4">
                 <Button
@@ -358,7 +267,7 @@ export const EditCampaign = () => {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isSubmitting || rotation.length === 0}
+                  disabled={isSubmitting}
                   className="flex-1"
                 >
                   {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}

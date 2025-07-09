@@ -56,7 +56,7 @@ export const Campaigns = () => {
 
       if (!team) return;
 
-      // Fetch campaigns with their data
+      // Fetch campaigns with basic data - seller distribution is now dynamic
       const { data: campaignsData } = await supabase
         .from('campaigns')
         .select(`
@@ -64,16 +64,7 @@ export const Campaigns = () => {
           name,
           slug,
           is_active,
-          campaign_links (
-            id,
-            position,
-            seller_contacts (
-              seller_id,
-              sellers (
-                name
-              )
-            )
-          )
+          team_id
         `)
         .eq('team_id', team.id)
         .order('created_at', { ascending: false });
@@ -97,19 +88,16 @@ export const Campaigns = () => {
             .eq('campaign_id', campaign.id)
             .gte('created_at', sevenDaysAgo.toISOString());
 
-          // Calculate seller distribution
-          const sellerCounts: { [key: string]: number } = {};
-          campaign.campaign_links.forEach((link: any) => {
-            const sellerName = link.seller_contacts?.sellers?.name;
-            if (sellerName) {
-              sellerCounts[sellerName] = (sellerCounts[sellerName] || 0) + 1;
-            }
-          });
+          // Get sellers for this team with their weights (dynamic distribution)
+          const { data: sellersData } = await supabase
+            .from('sellers')
+            .select('name, weight')
+            .eq('team_id', team.id);
 
-          const sellers = Object.entries(sellerCounts).map(([name, positions]) => ({
-            name,
-            positions,
-          }));
+          const sellers = sellersData?.map(seller => ({
+            name: seller.name,
+            positions: seller.weight, // Weight represents their share in the distribution
+          })) || [];
 
           return {
             id: campaign.id,

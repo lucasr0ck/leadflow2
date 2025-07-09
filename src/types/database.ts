@@ -10,6 +10,7 @@ export interface Seller {
   id: string;
   team_id: string;
   name: string;
+  weight: number;
   created_at: string;
 }
 
@@ -31,18 +32,12 @@ export interface Campaign {
   created_at: string;
 }
 
-export interface CampaignLink {
-  id: string;
-  campaign_id: string;
-  contact_id: string;
-  position: number;
-  created_at: string;
-}
+// CampaignLink interface removed - no longer using static links
 
 export interface Click {
   id: number;
   campaign_id: string;
-  campaign_link_id: string;
+  seller_id: string;
   created_at: string;
 }
 
@@ -50,10 +45,4 @@ export interface SellerWithContacts extends Seller {
   seller_contacts: SellerContact[];
 }
 
-export interface CampaignWithLinks extends Campaign {
-  campaign_links: (CampaignLink & {
-    seller_contacts: SellerContact & {
-      sellers: Seller;
-    };
-  })[];
-}
+// CampaignWithLinks interface removed - no longer using static links

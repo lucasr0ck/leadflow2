@@ -62,18 +62,14 @@ export const useAnalytics = (dateRange: DateRange) => {
           id,
           created_at,
           campaign_id,
+          seller_id,
           campaigns!inner (
             name,
             slug,
             team_id
           ),
-          campaign_links!inner (
-            seller_contacts!inner (
-              id,
-              sellers (
-                name
-              )
-            )
+          sellers!inner (
+            name
           )
         `)
         .eq('campaigns.team_id', team.id)
@@ -113,17 +109,17 @@ export const useAnalytics = (dateRange: DateRange) => {
       // Stats por vendedor
       const sellerMap = new Map<string, { name: string; clicks: number; contacts: Set<string> }>();
       clicks.forEach(click => {
-        const sellerName = click.campaign_links.seller_contacts.sellers.name;
-        const contactId = click.campaign_links.seller_contacts.id;
+        const sellerName = click.sellers.name;
+        const sellerId = click.seller_id;
         
         if (sellerMap.has(sellerName)) {
           sellerMap.get(sellerName)!.clicks++;
-          sellerMap.get(sellerName)!.contacts.add(contactId);
+          sellerMap.get(sellerName)!.contacts.add(sellerId);
         } else {
           sellerMap.set(sellerName, {
             name: sellerName,
             clicks: 1,
-            contacts: new Set([contactId])
+            contacts: new Set([sellerId])
           });
         }
       });

@@ -15,6 +15,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 interface Seller {
   id: string;
   name: string;
+  weight: number;
   created_at: string;
   contacts: Array<{
     id: string;
@@ -67,6 +68,7 @@ export const Sellers = () => {
         .select(`
           id,
           name,
+          weight,
           created_at,
           seller_contacts (
             id,
@@ -149,6 +151,41 @@ export const Sellers = () => {
     }
   };
 
+  const updateSellerWeight = async (sellerId: string, newWeight: number) => {
+    try {
+      const { error } = await supabase
+        .from('sellers')
+        .update({ weight: newWeight })
+        .eq('id', sellerId);
+
+      if (error) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível atualizar o peso do vendedor.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update local state
+      setSellers(prev => prev.map(seller => 
+        seller.id === sellerId ? { ...seller, weight: newWeight } : seller
+      ));
+
+      toast({
+        title: "Sucesso",
+        description: "Peso do vendedor atualizado com sucesso!",
+      });
+    } catch (error) {
+      console.error('Error updating seller weight:', error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao atualizar peso.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-8">
@@ -223,6 +260,43 @@ export const Sellers = () => {
               </CardHeader>
               
               <CardContent className="space-y-4">
+                {/* Weight Control Section */}
+                <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-foreground">
+                        Peso (Distribuição Global)
+                      </label>
+                      <p className="text-xs text-muted-foreground">
+                        Um vendedor com peso 2 recebe o dobro de leads de um com peso 1
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-8 p-0"
+                        onClick={() => updateSellerWeight(seller.id, Math.max(1, seller.weight - 1))}
+                        disabled={seller.weight <= 1}
+                      >
+                        -
+                      </Button>
+                      <span className="text-lg font-bold text-primary min-w-[2rem] text-center">
+                        {seller.weight}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-8 p-0"
+                        onClick={() => updateSellerWeight(seller.id, seller.weight + 1)}
+                        disabled={seller.weight >= 10}
+                      >
+                        +
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Contact Count */}
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Contatos:</span>

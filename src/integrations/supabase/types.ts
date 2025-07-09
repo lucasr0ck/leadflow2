@@ -14,45 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      campaign_links: {
-        Row: {
-          campaign_id: string
-          contact_id: string
-          created_at: string
-          id: string
-          position: number
-        }
-        Insert: {
-          campaign_id: string
-          contact_id: string
-          created_at?: string
-          id?: string
-          position: number
-        }
-        Update: {
-          campaign_id?: string
-          contact_id?: string
-          created_at?: string
-          id?: string
-          position?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "campaign_links_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaigns"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "campaign_links_contact_id_fkey"
-            columns: ["contact_id"]
-            isOneToOne: false
-            referencedRelation: "seller_contacts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       campaigns: {
         Row: {
           created_at: string
@@ -94,21 +55,21 @@ export type Database = {
       clicks: {
         Row: {
           campaign_id: string
-          campaign_link_id: string
           created_at: string
           id: number
+          seller_id: string | null
         }
         Insert: {
           campaign_id: string
-          campaign_link_id: string
           created_at?: string
           id?: never
+          seller_id?: string | null
         }
         Update: {
           campaign_id?: string
-          campaign_link_id?: string
           created_at?: string
           id?: never
+          seller_id?: string | null
         }
         Relationships: [
           {
@@ -119,10 +80,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "clicks_campaign_link_id_fkey"
-            columns: ["campaign_link_id"]
+            foreignKeyName: "clicks_seller_id_fkey"
+            columns: ["seller_id"]
             isOneToOne: false
-            referencedRelation: "campaign_links"
+            referencedRelation: "sellers"
             referencedColumns: ["id"]
           },
         ]
@@ -165,18 +126,21 @@ export type Database = {
           id: string
           name: string
           team_id: string
+          weight: number
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
           team_id: string
+          weight?: number
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
           team_id?: string
+          weight?: number
         }
         Relationships: [
           {

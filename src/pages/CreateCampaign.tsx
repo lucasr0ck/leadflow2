@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -13,7 +12,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { BackButton } from '@/components/BackButton';
-import { SellerRotationManager } from '@/components/campaigns/SellerRotationManager';
 
 const campaignSchema = z.object({
   name: z.string().min(1, 'Nome da campanha é obrigatório'),
@@ -23,18 +21,11 @@ const campaignSchema = z.object({
 
 type CampaignFormData = z.infer<typeof campaignSchema>;
 
-interface RotationEntry {
-  sellerId: string;
-  sellerName: string;
-  repetitions: number;
-}
-
 export const CreateCampaign = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [rotation, setRotation] = useState<RotationEntry[]>([]);
 
   const form = useForm<CampaignFormData>({
     resolver: zodResolver(campaignSchema),
@@ -47,15 +38,6 @@ export const CreateCampaign = () => {
 
   const onSubmit = async (data: CampaignFormData) => {
     if (!user) return;
-
-    if (rotation.length === 0) {
-      toast({
-        title: "Erro",
-        description: "Adicione pelo menos um vendedor à rotação.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     try {
       setIsSubmitting(true);
@@ -98,30 +80,9 @@ export const CreateCampaign = () => {
         return;
       }
 
-      // Create fair campaign distribution using the new database function
-      const sellerRepetitions = rotation.map(entry => ({
-        seller_id: entry.sellerId,
-        repetitions: entry.repetitions
-      }));
-
-      const { data: distributionResult, error: distributionError } = await supabase
-        .rpc('create_campaign_distribution', {
-          campaign_id_param: campaign.id,
-          seller_repetitions: sellerRepetitions
-        });
-
-      if (distributionError || !distributionResult?.[0]?.success) {
-        toast({
-          title: "Erro",
-          description: "Campanha criada, mas erro ao configurar rotação.",
-          variant: "destructive",
-        });
-        return;
-      }
-
       toast({
         title: "Sucesso",
-        description: "Campanha criada com sucesso!",
+        description: "Campanha criada com sucesso! O sistema distribuirá automaticamente os leads usando os pesos configurados nos vendedores.",
       });
 
       navigate('/campaigns');
@@ -206,11 +167,17 @@ export const CreateCampaign = () => {
                 )}
               />
 
-              {/* Seller Rotation Section */}
-              <SellerRotationManager 
-                rotation={rotation}
-                onRotationChange={setRotation}
-              />
+              {/* Lead Distribution Info */}
+              <div className="p-4 bg-muted/30 rounded-lg border">
+                <h3 className="font-medium text-foreground mb-2">Distribuição Automática de Leads</h3>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Os leads desta campanha serão distribuídos automaticamente entre todos os vendedores ativos do seu time, 
+                  respeitando os pesos configurados na página de vendedores.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  💡 Para configurar a distribuição, vá para a página "Vendedores" e ajuste o peso de cada vendedor.
+                </p>
+              </div>
 
               <div className="flex gap-4">
                 <Button
@@ -224,7 +191,7 @@ export const CreateCampaign = () => {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isSubmitting || rotation.length === 0}
+                  disabled={isSubmitting}
                   className="flex-1"
                 >
                   {isSubmitting ? 'Criando...' : 'Criar Campanha'}
