@@ -1,5 +1,8 @@
 # Etapa 1: Construir a aplicação Vite/React
 FROM node:18-alpine as builder
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_APP_BASE_URL
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
