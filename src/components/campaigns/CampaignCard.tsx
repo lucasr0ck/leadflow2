@@ -43,7 +43,9 @@ export const CampaignCard = ({ campaign, onCampaignDeleted }: CampaignCardProps)
     e.preventDefault();
     e.stopPropagation();
     
-    const redirectUrl = `${window.location.origin}/r/${campaign.slug}`;
+    // Use absolute URL for production deployment
+    const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
+    const redirectUrl = `${baseUrl}/r/${campaign.slug}`;
     
     try {
       await navigator.clipboard.writeText(redirectUrl);
