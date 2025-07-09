@@ -18,8 +18,70 @@ import { Analytics } from '@/pages/Analytics';
 import { CampaignAnalytics } from '@/pages/CampaignAnalytics';
 import { PublicRedirect } from '@/pages/PublicRedirect';
 import NotFound from "./pages/NotFound";
+import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { DebugInfo } from '@/components/DebugInfo';
+import { SupabaseHealthCheck } from '@/components/SupabaseHealthCheck';
 
-const queryClient = new QueryClient();
+// Error Boundary Component
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Application Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+          <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
+            <h1 className="text-xl font-semibold text-red-600 mb-4">
+              Application Error
+            </h1>
+            <p className="text-slate-600 mb-4">
+              Something went wrong while loading the application.
+            </p>
+            {this.state.error && (
+              <details className="text-sm text-slate-500">
+                <summary className="cursor-pointer mb-2">Error Details</summary>
+                <pre className="bg-slate-100 p-2 rounded text-xs overflow-auto">
+                  {this.state.error.message}
+                </pre>
+              </details>
+            )}
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const AppRoutes = () => {
   const { user, loading } = useAuth();
@@ -124,8 +186,12 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <AppRoutes />
+          <ErrorBoundary>
+            <AppRoutes />
+          </ErrorBoundary>
         </BrowserRouter>
+        <DebugInfo isVisible={import.meta.env.MODE === 'production'} />
+        <SupabaseHealthCheck isVisible={import.meta.env.MODE === 'production'} />
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>

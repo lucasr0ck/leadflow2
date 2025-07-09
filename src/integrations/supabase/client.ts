@@ -3,13 +3,32 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://sbpjwmoddlajtqvoykuf.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNicGp3bW9kZGxhanRxdm95a3VmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1NjM5NDgsImV4cCI6MjA2NzEzOTk0OH0.RL-5YBpe_npXDNYPlSvuNG1wCiwnxvlc0MVepoDrsT8";
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Validate environment variables
+if (!supabaseUrl || !supabaseAnonKey) {
+  const missingVars = [];
+  if (!supabaseUrl) missingVars.push('VITE_SUPABASE_URL');
+  if (!supabaseAnonKey) missingVars.push('VITE_SUPABASE_ANON_KEY');
+  
+  throw new Error(
+    `Missing required environment variables: ${missingVars.join(', ')}. ` +
+    'Please check your .env file or server environment variables configuration.'
+  );
+}
+
+// Validate URL format
+try {
+  new URL(supabaseUrl);
+} catch (error) {
+  throw new Error(`Invalid Supabase URL format: ${supabaseUrl}`);
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: localStorage,
     persistSession: true,
