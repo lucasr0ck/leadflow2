@@ -19,8 +19,6 @@ import { CampaignAnalytics } from '@/pages/CampaignAnalytics';
 import { PublicRedirect } from '@/pages/PublicRedirect';
 import NotFound from "./pages/NotFound";
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { DebugInfo } from '@/components/DebugInfo';
-import { SupabaseHealthCheck } from '@/components/SupabaseHealthCheck';
 
 // Error Boundary Component
 class ErrorBoundary extends Component<
@@ -167,9 +165,7 @@ const AppRoutes = () => {
       <Route
         path="/analytics/campaign/:id"
         element={
-          <ProtectedRoute>
-            <CampaignAnalytics />
-          </ProtectedRoute>
+          <CampaignAnalytics />
         }
       />
       {/* Public redirect route - no authentication required */}
@@ -190,8 +186,6 @@ const App = () => (
             <AppRoutes />
           </ErrorBoundary>
         </BrowserRouter>
-        <DebugInfo isVisible={import.meta.env.MODE === 'production'} />
-        <SupabaseHealthCheck isVisible={import.meta.env.MODE === 'production'} />
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
