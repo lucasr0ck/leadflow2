@@ -71,15 +71,23 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
 
   useEffect(() => {
     if (seller && open) {
+      const contactsData = seller.contacts.length > 0 
+        ? seller.contacts.map(contact => ({
+            id: contact.id,
+            phone_number: contact.phone_number,
+            description: contact.description || '',
+          }))
+        : [];
+      
       form.reset({
         name: seller.name,
-        contacts: seller.contacts.length > 0 
-          ? seller.contacts.map(contact => ({
-              id: contact.id,
-              phone_number: contact.phone_number,
-              description: contact.description || '',
-            }))
-          : [],
+        contacts: contactsData,
+      });
+    } else if (!open) {
+      // Clear form when dialog is closed
+      form.reset({
+        name: '',
+        contacts: [],
       });
     }
   }, [seller, open, form]);
@@ -131,12 +139,12 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
         });
       }
 
-      // Remove from form array
+      // Remove from form array immediately for visual feedback
       remove(contactToDelete.index);
       setDeleteConfirmOpen(false);
       setContactToDelete(null);
 
-      // Refresh the parent component
+      // Refresh the parent component to sync with database
       onSellerUpdated();
     } catch (error) {
       console.error('Error deleting contact:', error);
