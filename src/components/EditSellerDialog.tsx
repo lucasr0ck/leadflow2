@@ -19,7 +19,7 @@ const sellerSchema = z.object({
     id: z.string().optional(),
     phone_number: z.string().min(1, 'Número de telefone é obrigatório'),
     description: z.string().optional(),
-  })).min(1, 'Pelo menos um contato é obrigatório'),
+  })).min(0, 'Lista de contatos deve ser válida'),
 });
 
 type SellerFormData = z.infer<typeof sellerSchema>;
@@ -79,7 +79,7 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
               phone_number: contact.phone_number,
               description: contact.description || '',
             }))
-          : [{ phone_number: '', description: '' }],
+          : [],
       });
     }
   }, [seller, open, form]);
@@ -95,26 +95,41 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
     try {
       setIsDeletingContact(true);
 
-      // Use the new delete_contact_and_links function
+      // Try to use the RPC function first
       const { data, error } = await supabase.rpc('delete_contact_and_links', {
         contact_id_to_delete: contactToDelete.id
       }) as { data: DeleteContactResponse[] | null; error: any };
 
       if (error || !data || data.length === 0 || !data[0].success) {
-        toast({
-          title: "Erro",
-          description: data?.[0]?.message || "Não foi possível remover o contato.",
-          variant: "destructive",
-        });
-        return;
-      }
+        // If RPC fails, try direct deletion
+        console.log('RPC function failed, trying direct deletion...');
+        
+        const { error: deleteError } = await supabase
+          .from('seller_contacts')
+          .delete()
+          .eq('id', contactToDelete.id);
 
-      // Show success message with details
-      const linksDeleted = data[0].deleted_links_count || 0;
-      toast({
-        title: "Sucesso",
-        description: `Contato removido com sucesso${linksDeleted > 0 ? ` (${linksDeleted} links de campanha também foram removidos)` : ''}.`,
-      });
+        if (deleteError) {
+          toast({
+            title: "Erro",
+            description: "Não foi possível remover o contato.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        toast({
+          title: "Sucesso",
+          description: "Contato removido com sucesso.",
+        });
+      } else {
+        // RPC function worked
+        const linksDeleted = data[0].deleted_links_count || 0;
+        toast({
+          title: "Sucesso",
+          description: `Contato removido com sucesso${linksDeleted > 0 ? ` (${linksDeleted} links de campanha também foram removidos)` : ''}.`,
+        });
+      }
 
       // Remove from form array
       remove(contactToDelete.index);
@@ -250,11 +265,16 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
                   </Button>
                 </div>
 
-                {fields.map((field, index) => (
-                  <div key={field.id} className="p-4 border rounded-lg space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium">Contato {index + 1}</h4>
-                      {fields.length > 1 && (
+                {fields.length === 0 ? (
+                  <div className="p-4 border rounded-lg text-center text-muted-foreground">
+                    <p>Nenhum contato cadastrado. Este vendedor ficará ativo em prontidão, mas não receberá redirecionamentos.</p>
+                    <p className="text-sm mt-2">Clique em "Adicionar Contato" para cadastrar um número de telefone.</p>
+                  </div>
+                ) : (
+                  fields.map((field, index) => (
+                    <div key={field.id} className="p-4 border rounded-lg space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">Contato {index + 1}</h4>
                         <Button
                           type="button"
                           variant="ghost"
@@ -272,44 +292,44 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
-                      )}
+                      </div>
+
+                      <FormField
+                        control={form.control}
+                        name={`contacts.${index}.phone_number`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Número de Contato</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Ex: 5511999998888"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name={`contacts.${index}.description`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Descrição (Opcional)</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Ex: WhatsApp pessoal"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
-
-                    <FormField
-                      control={form.control}
-                      name={`contacts.${index}.phone_number`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Número de Contato</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="Ex: 5511999998888"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name={`contacts.${index}.description`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Descrição (Opcional)</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="Ex: WhatsApp pessoal"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
 
               <div className="flex gap-4">
