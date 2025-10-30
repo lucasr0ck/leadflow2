@@ -14,7 +14,18 @@ serve(async (req) => {
   }
 
   try {
-    const { slug } = await req.json()
+    // Accept slug from JSON body or query string for easier testing
+    let slug: string | null = null
+    try {
+      const body = await req.json()
+      slug = body?.slug ?? null
+    } catch (_) {
+      // no-op, fall back to query param
+    }
+    if (!slug) {
+      const url = new URL(req.url)
+      slug = url.searchParams.get('slug')
+    }
     
     if (!slug) {
       return new Response(

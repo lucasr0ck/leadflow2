@@ -93,7 +93,7 @@ export const Dashboard = () => {
           name,
           slug,
           created_at,
-          clicks(count)
+          clicks2(count)
         `)
         .eq('team_id', team.id)
         .order('created_at', { ascending: false })
