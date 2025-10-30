@@ -40,14 +40,16 @@ export const useSellerOperations = () => {
         .insert({
           name: data.name,
           team_id: team.id,
+          weight: 1,
         })
         .select()
         .single();
 
       if (sellerError || !seller) {
+        console.error('Error creating seller:', sellerError);
         toast({
           title: "Erro",
-          description: "Não foi possível criar o vendedor.",
+          description: sellerError?.message || "Não foi possível criar o vendedor.",
           variant: "destructive",
         });
         return;
@@ -65,9 +67,10 @@ export const useSellerOperations = () => {
         .insert(contacts);
 
       if (contactsError) {
+        console.error('Error creating contacts:', contactsError);
         toast({
           title: "Erro",
-          description: "Não foi possível criar os contatos.",
+          description: contactsError?.message || "Não foi possível criar os contatos.",
           variant: "destructive",
         });
         return;
