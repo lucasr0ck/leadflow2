@@ -113,7 +113,7 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
         console.log('RPC function failed, trying direct deletion...');
         
         const { error: deleteError } = await supabase
-          .from('seller_contacts')
+          .from('seller_contacts2')
           .delete()
           .eq('id', contactToDelete.id);
 
@@ -166,7 +166,7 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
 
       // Update seller name
       const { error: sellerError } = await supabase
-        .from('sellers')
+        .from('sellers2')
         .update({ name: data.name })
         .eq('id', seller.id);
 
@@ -184,7 +184,7 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
         if (contact.id) {
           // Update existing contact
           const { error: updateError } = await supabase
-            .from('seller_contacts')
+            .from('seller_contacts2')
             .update({
               phone_number: contact.phone_number,
               description: contact.description || null,
@@ -197,7 +197,7 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
         } else {
           // Create new contact
           const { error: createError } = await supabase
-            .from('seller_contacts')
+            .from('seller_contacts2')
             .insert({
               seller_id: seller.id,
               phone_number: contact.phone_number,

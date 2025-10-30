@@ -44,7 +44,7 @@ export const CreateCampaign = () => {
 
       // Get user's team
       const { data: team } = await supabase
-        .from('teams')
+        .from('teams2')
         .select('id')
         .eq('owner_id', user.id)
         .single();
@@ -60,7 +60,7 @@ export const CreateCampaign = () => {
 
       // Create campaign
       const { data: campaign, error: campaignError } = await supabase
-        .from('campaigns')
+        .from('campaigns2')
         .insert({
           name: data.name,
           slug: data.slug,

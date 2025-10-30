@@ -55,7 +55,7 @@ export const Sellers = () => {
       
       // Get user's team
       const { data: team } = await supabase
-        .from('teams')
+        .from('teams2')
         .select('id')
         .eq('owner_id', user!.id)
         .single();
@@ -64,7 +64,7 @@ export const Sellers = () => {
 
       // Fetch sellers with their contacts
       const { data: sellersData } = await supabase
-        .from('sellers')
+        .from('sellers2')
         .select(`
           id,
           name,
@@ -154,7 +154,7 @@ export const Sellers = () => {
   const updateSellerWeight = async (sellerId: string, newWeight: number) => {
     try {
       const { error } = await supabase
-        .from('sellers')
+        .from('sellers2')
         .update({ weight: newWeight })
         .eq('id', sellerId);
 

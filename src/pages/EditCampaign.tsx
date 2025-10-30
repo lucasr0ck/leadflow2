@@ -50,7 +50,7 @@ export const EditCampaign = () => {
 
       // Get user's team
       const { data: team } = await supabase
-        .from('teams')
+        .from('teams2')
         .select('id')
         .eq('owner_id', user!.id)
         .single();
@@ -67,7 +67,7 @@ export const EditCampaign = () => {
 
       // Fetch campaign data
       const { data: campaign, error: campaignError } = await supabase
-        .from('campaigns')
+        .from('campaigns2')
         .select('id, name, slug, greeting_message')
         .eq('id', id)
         .eq('team_id', team.id)
@@ -108,7 +108,7 @@ export const EditCampaign = () => {
 
       // Get user's team
       const { data: team } = await supabase
-        .from('teams')
+        .from('teams2')
         .select('id')
         .eq('owner_id', user.id)
         .single();
@@ -124,7 +124,7 @@ export const EditCampaign = () => {
 
       // Update campaign
       const { error: campaignError } = await supabase
-        .from('campaigns')
+        .from('campaigns2')
         .update({
           name: data.name,
           slug: data.slug,

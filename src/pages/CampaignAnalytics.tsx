@@ -50,7 +50,7 @@ export const CampaignAnalytics = () => {
 
       // Get campaign basic info
       const { data: campaign } = await supabase
-        .from('campaigns')
+        .from('campaigns2')
         .select('id, name, slug')
         .eq('id', id)
         .single();
@@ -62,7 +62,7 @@ export const CampaignAnalytics = () => {
       const endDate = endOfDay(dateRange.to);
 
       const { data: clicksData } = await supabase
-        .from('clicks')
+        .from('clicks2')
         .select('created_at')
         .eq('campaign_id', id)
         .gte('created_at', startDate.toISOString())

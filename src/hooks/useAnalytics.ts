@@ -48,7 +48,7 @@ export const useAnalytics = (dateRange: DateRange) => {
     setLoading(true);
     try {
       const { data: team } = await supabase
-        .from('teams')
+        .from('teams2')
         .select('id')
         .eq('owner_id', user!.id)
         .single();
@@ -57,22 +57,22 @@ export const useAnalytics = (dateRange: DateRange) => {
 
       // Buscar cliques no período
       const { data: clicksData } = await supabase
-        .from('clicks')
+        .from('clicks2')
         .select(`
           id,
           created_at,
           campaign_id,
           seller_id,
-          campaigns!inner (
+          campaigns2!inner (
             name,
             slug,
             team_id
           ),
-          sellers!inner (
+          sellers2!inner (
             name
           )
         `)
-        .eq('campaigns.team_id', team.id)
+        .eq('campaigns2.team_id', team.id)
         .gte('created_at', dateRange.start.toISOString())
         .lte('created_at', dateRange.end.toISOString())
         .order('created_at', { ascending: false });

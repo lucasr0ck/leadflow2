@@ -20,7 +20,7 @@ export const useSellerOperations = () => {
 
       // Get user's team
       const { data: team } = await supabase
-        .from('teams')
+        .from('teams2')
         .select('id')
         .eq('owner_id', user.id)
         .single();
@@ -36,7 +36,7 @@ export const useSellerOperations = () => {
 
       // Create seller
       const { data: seller, error: sellerError } = await supabase
-        .from('sellers')
+        .from('sellers2')
         .insert({
           name: data.name,
           team_id: team.id,
@@ -61,7 +61,7 @@ export const useSellerOperations = () => {
       }));
 
       const { error: contactsError } = await supabase
-        .from('seller_contacts')
+        .from('seller_contacts2')
         .insert(contacts);
 
       if (contactsError) {

@@ -49,7 +49,7 @@ export const Campaigns = () => {
       
       // Get user's team
       const { data: team } = await supabase
-        .from('teams')
+        .from('teams2')
         .select('id')
         .eq('owner_id', user!.id)
         .single();
@@ -58,7 +58,7 @@ export const Campaigns = () => {
 
       // Fetch campaigns with basic data - seller distribution is now dynamic
       const { data: campaignsData } = await supabase
-        .from('campaigns')
+        .from('campaigns2')
         .select(`
           id,
           name,
@@ -76,21 +76,21 @@ export const Campaigns = () => {
         campaignsData.map(async (campaign) => {
           // Get total clicks
           const { data: totalClicksData } = await supabase
-            .from('clicks')
+            .from('clicks2')
             .select('id')
             .eq('campaign_id', campaign.id);
 
           // Get clicks from last 7 days
           const sevenDaysAgo = startOfDay(subDays(new Date(), 7));
           const { data: recentClicksData } = await supabase
-            .from('clicks')
+            .from('clicks2')
             .select('id')
             .eq('campaign_id', campaign.id)
             .gte('created_at', sevenDaysAgo.toISOString());
 
           // Get sellers for this team with their weights (dynamic distribution)
           const { data: sellersData } = await supabase
-            .from('sellers')
+            .from('sellers2')
             .select('name, weight')
             .eq('team_id', team.id);
 

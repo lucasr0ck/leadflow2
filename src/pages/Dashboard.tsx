@@ -38,7 +38,7 @@ export const Dashboard = () => {
     try {
       // Get user's team
       const { data: team } = await supabase
-        .from('teams')
+        .from('teams2')
         .select('id')
         .eq('owner_id', user!.id)
         .single();
@@ -47,13 +47,13 @@ export const Dashboard = () => {
 
       // Fetch stats
       const [sellersRes, campaignsRes, clicksRes] = await Promise.all([
-        supabase.from('sellers').select('id').eq('team_id', team.id),
-        supabase.from('campaigns').select('id').eq('team_id', team.id),
+        supabase.from('sellers2').select('id').eq('team_id', team.id),
+        supabase.from('campaigns2').select('id').eq('team_id', team.id),
         supabase
-          .from('clicks')
-          .select('id, campaign_id, campaigns!inner(team_id)')
+          .from('clicks2')
+          .select('id, campaign_id, campaigns2!inner(team_id)')
           .gte('created_at', startOfDay(new Date()).toISOString())
-          .eq('campaigns.team_id', team.id),
+          .eq('campaigns2.team_id', team.id),
       ]);
 
       setStats({
@@ -70,11 +70,11 @@ export const Dashboard = () => {
         
         chartPromises.push(
           supabase
-            .from('clicks')
-            .select('id, campaign_id, campaigns!inner(team_id)')
+            .from('clicks2')
+            .select('id, campaign_id, campaigns2!inner(team_id)')
             .gte('created_at', startOfDay(date).toISOString())
             .lt('created_at', startOfDay(subDays(date, -1)).toISOString())
-            .eq('campaigns.team_id', team.id)
+            .eq('campaigns2.team_id', team.id)
             .then(res => ({
               date: format(date, 'MM/dd'),
               clicks: res.data?.length || 0,
@@ -87,7 +87,7 @@ export const Dashboard = () => {
 
       // Fetch recent campaigns
       const { data: campaigns } = await supabase
-        .from('campaigns')
+        .from('campaigns2')
         .select(`
           id,
           name,

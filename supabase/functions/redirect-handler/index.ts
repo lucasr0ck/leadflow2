@@ -35,7 +35,7 @@ serve(async (req) => {
 
     // Step 1: Fetch campaign and validate it's active
     const { data: campaign, error: campaignError } = await supabase
-      .from('campaigns')
+      .from('campaigns2')
       .select('id, greeting_message, team_id, is_active')
       .eq('slug', slug)
       .single()
@@ -64,13 +64,13 @@ serve(async (req) => {
 
     // Step 2: Fetch all sellers for this team with their contacts and weights
     const { data: sellers, error: sellersError } = await supabase
-      .from('sellers')
+      .from('sellers2')
       .select(`
         id,
         name,
         weight,
         created_at,
-        seller_contacts!inner (
+        seller_contacts2!inner (
           id,
           phone_number,
           description
@@ -103,7 +103,7 @@ serve(async (req) => {
 
     // Step 4: Get total clicks for this campaign to determine next seller
     const { count: totalClicks, error: clicksError } = await supabase
-      .from('clicks')
+      .from('clicks2')
       .select('*', { count: 'exact', head: true })
       .eq('campaign_id', campaign.id)
 
@@ -129,7 +129,7 @@ serve(async (req) => {
 
     // Step 6: Get this seller's click count to determine which contact to use
     const { count: sellerClicks, error: sellerClicksError } = await supabase
-      .from('clicks')
+      .from('clicks2')
       .select('*', { count: 'exact', head: true })
       .eq('campaign_id', campaign.id)
       .eq('seller_id', targetSeller.id)
@@ -169,7 +169,7 @@ serve(async (req) => {
     const logClick = async () => {
       try {
         const { error: logError } = await supabase
-          .from('clicks')
+          .from('clicks2')
           .insert({
             campaign_id: campaign.id,
             seller_id: targetSeller.id
