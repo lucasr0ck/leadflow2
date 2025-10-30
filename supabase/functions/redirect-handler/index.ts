@@ -14,14 +14,7 @@ serve(async (req) => {
   }
 
   try {
-    // Determine which application is making the request based on Referer header
-    const referer = req.headers.get('referer') || ''
-    const origin = req.headers.get('origin') || ''
-    const isLeadflow2 = referer.includes('leadflow2.') || origin.includes('leadflow2.')
-    
-    console.log(`[${new Date().toISOString()}] Request from: ${origin || referer}, isLeadflow2: ${isLeadflow2}`)
-
-    // Accept slug from JSON body or query string for easier testing
+    // First get the slug to determine which application we're dealing with
     let slug: string | null = null
     try {
       const body = await req.json()
@@ -49,24 +42,23 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    console.log(`[${new Date().toISOString()}] Processing redirect for slug: ${slug}, using ${isLeadflow2 ? 'leadflow2' : 'original'} tables`)
-
-    // Step 1: Get campaign from the correct table based on the requesting application
+    // Determine which application by checking which table contains the campaign
+    let isLeadflow2 = false
     let campaign = null
     let campaignError = null
-    
-    if (isLeadflow2) {
-      // Use new tables for leadflow2 application
-      const { data: campaign2, error: campaignError2 } = await supabase
-        .from('campaigns2')
-        .select('id, greeting_message, team_id, is_active')
-        .eq('slug', slug)
-        .single()
-      
+
+    // First try campaigns2 table (leadflow2)
+    const { data: campaign2, error: campaignError2 } = await supabase
+      .from('campaigns2')
+      .select('id, greeting_message, team_id, is_active')
+      .eq('slug', slug)
+      .single()
+
+    if (campaign2) {
+      isLeadflow2 = true
       campaign = campaign2
-      campaignError = campaignError2
     } else {
-      // Use original tables for original application
+      // Try original campaigns table (leadflow original)
       const { data: campaignOriginal, error: campaignErrorOriginal } = await supabase
         .from('campaigns')
         .select('id, greeting_message, team_id, is_active')
@@ -76,6 +68,8 @@ serve(async (req) => {
       campaign = campaignOriginal
       campaignError = campaignErrorOriginal
     }
+
+    console.log(`[${new Date().toISOString()}] Processing redirect for slug: ${slug}, detected as ${isLeadflow2 ? 'leadflow2' : 'original'} application`)
 
     if (campaignError || !campaign) {
       console.error('Campaign not found:', campaignError)
@@ -253,6 +247,32 @@ serve(async (req) => {
     if (sellerClicksError) {
       console.error('Error getting seller click count:', sellerClicksError)
     }
+
+    // Step 6.5: Get the last contact used to avoid immediate repetition
+    let lastContactPhone = null
+    if (isLeadflow2) {
+      const { data: lastClick } = await supabase
+        .from('clicks2')
+        .select('contact_phone')
+        .eq('campaign_id', campaign.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      
+      lastContactPhone = lastClick?.contact_phone
+    } else {
+      const { data: lastClick } = await supabase
+        .from('clicks')
+        .select('contact_phone')
+        .eq('campaign_id', campaign.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      
+      lastContactPhone = lastClick?.contact_phone
+    }
+
+    console.log(`Last contact used: ${lastContactPhone || 'none'}`)
     
     // Step 7: Select the contact using round-robin within the seller's contacts
     const contacts = targetSeller.contacts
@@ -267,8 +287,17 @@ serve(async (req) => {
       )
     }
 
-  const nextContactIndex = sellerClickCount % contacts.length
-  const targetContact = contacts[nextContactIndex]
+    // Calculate next contact index using round-robin
+    let nextContactIndex = sellerClickCount % contacts.length
+    let targetContact = contacts[nextContactIndex]
+    
+    // If we have more than one contact and the selected contact is the same as last used,
+    // advance to next contact to avoid immediate repetition
+    if (contacts.length > 1 && lastContactPhone && targetContact.phone_number === lastContactPhone) {
+      console.log(`Avoiding repetition of contact ${lastContactPhone}, advancing to next contact`)
+      nextContactIndex = (nextContactIndex + 1) % contacts.length
+      targetContact = contacts[nextContactIndex]
+    }
 
     console.log(`Contact selection details:`)
     console.log(`- Seller: ${targetSeller.name} (ID: ${targetSeller.id})`)
@@ -276,10 +305,13 @@ serve(async (req) => {
     console.log(`- Total contacts for seller: ${contacts.length}`)
     console.log(`- Contact index selected: ${nextContactIndex}`)
     console.log(`- Selected contact: ${targetContact.phone_number}`)
+    console.log(`- Last used contact: ${lastContactPhone || 'none'}`)
     
     // Log all contacts for this seller for debugging
     contacts.forEach((contact, index) => {
-      console.log(`  Contact ${index}: ${contact.phone_number} ${index === nextContactIndex ? '← SELECTED' : ''}`)
+      const isSelected = index === nextContactIndex
+      const wasLast = contact.phone_number === lastContactPhone
+      console.log(`  Contact ${index}: ${contact.phone_number} ${isSelected ? '← SELECTED' : ''} ${wasLast ? '(was last)' : ''}`)
     })
 
     // Step 8: Record the click in the correct table
