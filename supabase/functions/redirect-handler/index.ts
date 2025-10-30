@@ -14,6 +14,13 @@ serve(async (req) => {
   }
 
   try {
+    // Determine which application is making the request based on Referer header
+    const referer = req.headers.get('referer') || ''
+    const origin = req.headers.get('origin') || ''
+    const isLeadflow2 = referer.includes('leadflow2.') || origin.includes('leadflow2.')
+    
+    console.log(`[${new Date().toISOString()}] Request from: ${origin || referer}, isLeadflow2: ${isLeadflow2}`)
+
     // Accept slug from JSON body or query string for easier testing
     let slug: string | null = null
     try {
@@ -42,23 +49,24 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    console.log(`[${new Date().toISOString()}] Processing redirect for slug: ${slug}`)
+    console.log(`[${new Date().toISOString()}] Processing redirect for slug: ${slug}, using ${isLeadflow2 ? 'leadflow2' : 'original'} tables`)
 
-    // Step 1: Try both campaign table versions for compatibility
+    // Step 1: Get campaign from the correct table based on the requesting application
     let campaign = null
     let campaignError = null
     
-    // First try the new table (campaigns2)
-    const { data: campaign2, error: campaignError2 } = await supabase
-      .from('campaigns2')
-      .select('id, greeting_message, team_id, is_active')
-      .eq('slug', slug)
-      .single()
-
-    if (campaign2) {
+    if (isLeadflow2) {
+      // Use new tables for leadflow2 application
+      const { data: campaign2, error: campaignError2 } = await supabase
+        .from('campaigns2')
+        .select('id, greeting_message, team_id, is_active')
+        .eq('slug', slug)
+        .single()
+      
       campaign = campaign2
+      campaignError = campaignError2
     } else {
-      // Fallback to original table (campaigns)
+      // Use original tables for original application
       const { data: campaignOriginal, error: campaignErrorOriginal } = await supabase
         .from('campaigns')
         .select('id, greeting_message, team_id, is_active')
@@ -91,37 +99,39 @@ serve(async (req) => {
       )
     }
 
-    // Step 2: Fetch all sellers for this team with their contacts and weights
-    // Try both table versions for compatibility
+    // Step 2: Fetch all sellers for this team with their contacts and weights from correct tables
     let sellers = null
     let sellersError = null
     
-    // First try the new tables (leadflow2)
-    const { data: sellers2, error: sellersError2 } = await supabase
-      .from('sellers2')
-      .select(`
-        id,
-        name,
-        weight,
-        created_at,
-        seller_contacts2 (
+    if (isLeadflow2) {
+      // Use new tables for leadflow2 application
+      const { data: sellers2, error: sellersError2 } = await supabase
+        .from('sellers2')
+        .select(`
           id,
-          phone_number,
-          description
-        )
-      `)
-      .eq('team_id', campaign.team_id)
-      .order('created_at', { ascending: true })
+          name,
+          weight,
+          created_at,
+          seller_contacts2 (
+            id,
+            phone_number,
+            description
+          )
+        `)
+        .eq('team_id', campaign.team_id)
+        .order('created_at', { ascending: true })
 
-    if (sellers2 && sellers2.length > 0) {
       sellers = sellers2
+      sellersError = sellersError2
       // Normalize the contact relation name
-      sellers = sellers.map(seller => ({
-        ...seller,
-        contacts: seller.seller_contacts2 || []
-      }))
+      if (sellers) {
+        sellers = sellers.map(seller => ({
+          ...seller,
+          contacts: seller.seller_contacts2 || []
+        }))
+      }
     } else {
-      // Fallback to original tables (leadflow original)
+      // Use original tables for original application
       const { data: sellersOriginal, error: sellersErrorOriginal } = await supabase
         .from('sellers')
         .select(`
@@ -170,28 +180,41 @@ serve(async (req) => {
     }
 
     console.log(`Virtual wheel created with ${virtualWheel.length} slots for ${sellers.length} sellers`)
+    
+    // Log detailed seller information
+    sellers.forEach(seller => {
+      console.log(`Seller: ${seller.name}, Weight: ${seller.weight}, Contacts: ${seller.contacts?.length || 0}, Slots in wheel: ${seller.weight}`)
+    })
 
-    // Step 4: Get total clicks for this campaign (try both tables)
+    // Step 4: Get total clicks for this campaign from the correct table
     let clickCount = 0
+    let clicksError = null
     
-    // Try clicks2 first
-    const { count: totalClicks2 } = await supabase
-      .from('clicks2')
-      .select('*', { count: 'exact', head: true })
-      .eq('campaign_id', campaign.id)
-    
-    if (totalClicks2 && totalClicks2 > 0) {
-      clickCount = totalClicks2
+    if (isLeadflow2) {
+      // Use clicks2 table for leadflow2 application
+      const { count: totalClicks2, error: clicksError2 } = await supabase
+        .from('clicks2')
+        .select('*', { count: 'exact', head: true })
+        .eq('campaign_id', campaign.id)
+      
+      clickCount = totalClicks2 || 0
+      clicksError = clicksError2
     } else {
-      // Fallback to clicks
-      const { count: totalClicks } = await supabase
+      // Use clicks table for original application
+      const { count: totalClicks, error: clicksError1 } = await supabase
         .from('clicks')
         .select('*', { count: 'exact', head: true })
         .eq('campaign_id', campaign.id)
+      
       clickCount = totalClicks || 0
+      clicksError = clicksError1
     }
 
-    console.log(`Total clicks for campaign: ${clickCount}`)
+    console.log(`Total clicks for campaign (${isLeadflow2 ? 'clicks2' : 'clicks'} table): ${clickCount}`)
+
+    if (clicksError) {
+      console.error('Error getting click count:', clicksError)
+    }
 
     // Step 5: Determine the next seller using round-robin on the virtual wheel
     const nextSellerIndex = clickCount % virtualWheel.length
@@ -199,26 +222,36 @@ serve(async (req) => {
 
     console.log(`Selected seller: ${targetSeller.name} (index: ${nextSellerIndex})`)
 
-    // Step 6: Get this seller's click count (try both tables)
+    // Step 6: Get this seller's click count from the correct table
     let sellerClickCount = 0
+    let sellerClicksError = null
     
-    // Try clicks2 first
-    const { count: sellerClicks2 } = await supabase
-      .from('clicks2')
-      .select('*', { count: 'exact', head: true })
-      .eq('campaign_id', campaign.id)
-      .eq('seller_id', targetSeller.id)
-    
-    if (sellerClicks2 && sellerClicks2 > 0) {
-      sellerClickCount = sellerClicks2
+    if (isLeadflow2) {
+      // Use clicks2 table for leadflow2 application
+      const { count: sellerClicks2, error: sellerClicksError2 } = await supabase
+        .from('clicks2')
+        .select('*', { count: 'exact', head: true })
+        .eq('campaign_id', campaign.id)
+        .eq('seller_id', targetSeller.id)
+      
+      sellerClickCount = sellerClicks2 || 0
+      sellerClicksError = sellerClicksError2
     } else {
-      // Fallback to clicks
-      const { count: sellerClicks } = await supabase
+      // Use clicks table for original application
+      const { count: sellerClicks, error: sellerClicksError1 } = await supabase
         .from('clicks')
         .select('*', { count: 'exact', head: true })
         .eq('campaign_id', campaign.id)
         .eq('seller_id', targetSeller.id)
+      
       sellerClickCount = sellerClicks || 0
+      sellerClicksError = sellerClicksError1
+    }
+
+    console.log(`Seller clicks count (${isLeadflow2 ? 'clicks2' : 'clicks'} table): ${sellerClickCount}`)
+
+    if (sellerClicksError) {
+      console.error('Error getting seller click count:', sellerClicksError)
     }
     
     // Step 7: Select the contact using round-robin within the seller's contacts
@@ -237,32 +270,48 @@ serve(async (req) => {
   const nextContactIndex = sellerClickCount % contacts.length
   const targetContact = contacts[nextContactIndex]
 
-    console.log(`Selected contact: ${targetContact.phone_number} (seller clicks: ${sellerClickCount}, contact index: ${nextContactIndex})`)
-
-    // Step 8: Record the click (try both tables)
-    // Try clicks2 first
-    const { error: insertError2 } = await supabase
-      .from('clicks2')
-      .insert({
-        campaign_id: campaign.id,
-        seller_id: targetSeller.id,
-        contact_phone: targetContact.phone_number
-      })
+    console.log(`Contact selection details:`)
+    console.log(`- Seller: ${targetSeller.name} (ID: ${targetSeller.id})`)
+    console.log(`- Seller click count: ${sellerClickCount}`)
+    console.log(`- Total contacts for seller: ${contacts.length}`)
+    console.log(`- Contact index selected: ${nextContactIndex}`)
+    console.log(`- Selected contact: ${targetContact.phone_number}`)
     
-    if (insertError2) {
-      // Fallback to clicks table
-      const { error: insertError } = await supabase
+    // Log all contacts for this seller for debugging
+    contacts.forEach((contact, index) => {
+      console.log(`  Contact ${index}: ${contact.phone_number} ${index === nextContactIndex ? '← SELECTED' : ''}`)
+    })
+
+    // Step 8: Record the click in the correct table
+    let insertError = null
+    
+    if (isLeadflow2) {
+      // Use clicks2 table for leadflow2 application
+      const { error: insertError2 } = await supabase
+        .from('clicks2')
+        .insert({
+          campaign_id: campaign.id,
+          seller_id: targetSeller.id,
+          contact_phone: targetContact.phone_number
+        })
+      insertError = insertError2
+    } else {
+      // Use clicks table for original application
+      const { error: insertError1 } = await supabase
         .from('clicks')
         .insert({
           campaign_id: campaign.id,
           seller_id: targetSeller.id,
           contact_phone: targetContact.phone_number
         })
-      
-      if (insertError) {
-        console.error('Error recording click in both tables:', insertError2, insertError)
-        // Continue anyway - don't block the redirect for analytics
-      }
+      insertError = insertError1
+    }
+
+    if (insertError) {
+      console.error(`Error recording click in ${isLeadflow2 ? 'clicks2' : 'clicks'} table:`, insertError)
+      // Continue anyway - don't block the redirect for analytics
+    } else {
+      console.log(`Click recorded successfully in ${isLeadflow2 ? 'clicks2' : 'clicks'} table`)
     }    // Step 9: Construct WhatsApp URL
   const encodedMessage = encodeURIComponent(campaign.greeting_message || '')
   // Sanitize phone number to keep only digits (format required by wa.me)
