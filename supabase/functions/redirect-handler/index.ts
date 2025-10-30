@@ -247,32 +247,6 @@ serve(async (req) => {
     if (sellerClicksError) {
       console.error('Error getting seller click count:', sellerClicksError)
     }
-
-    // Step 6.5: Get the last contact used to avoid immediate repetition
-    let lastContactPhone = null
-    if (isLeadflow2) {
-      const { data: lastClick } = await supabase
-        .from('clicks2')
-        .select('contact_phone')
-        .eq('campaign_id', campaign.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-      
-      lastContactPhone = lastClick?.contact_phone
-    } else {
-      const { data: lastClick } = await supabase
-        .from('clicks')
-        .select('contact_phone')
-        .eq('campaign_id', campaign.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-      
-      lastContactPhone = lastClick?.contact_phone
-    }
-
-    console.log(`Last contact used: ${lastContactPhone || 'none'}`)
     
     // Step 7: Select the contact using round-robin within the seller's contacts
     const contacts = targetSeller.contacts
@@ -287,14 +261,23 @@ serve(async (req) => {
       )
     }
 
+    // Step 7.5: Calculate the last contact used based on seller click count to avoid immediate repetition
+    let lastContactIndex = null
+    if (sellerClickCount > 0) {
+      // Calculate which contact was used in the previous click for this seller
+      lastContactIndex = (sellerClickCount - 1) % contacts.length
+    }
+
+    console.log(`Last contact index used: ${lastContactIndex !== null ? lastContactIndex : 'none'}`)
+
     // Calculate next contact index using round-robin
     let nextContactIndex = sellerClickCount % contacts.length
     let targetContact = contacts[nextContactIndex]
     
     // If we have more than one contact and the selected contact is the same as last used,
     // advance to next contact to avoid immediate repetition
-    if (contacts.length > 1 && lastContactPhone && targetContact.phone_number === lastContactPhone) {
-      console.log(`Avoiding repetition of contact ${lastContactPhone}, advancing to next contact`)
+    if (contacts.length > 1 && lastContactIndex !== null && nextContactIndex === lastContactIndex) {
+      console.log(`Avoiding repetition of contact index ${lastContactIndex}, advancing to next contact`)
       nextContactIndex = (nextContactIndex + 1) % contacts.length
       targetContact = contacts[nextContactIndex]
     }
@@ -305,12 +288,12 @@ serve(async (req) => {
     console.log(`- Total contacts for seller: ${contacts.length}`)
     console.log(`- Contact index selected: ${nextContactIndex}`)
     console.log(`- Selected contact: ${targetContact.phone_number}`)
-    console.log(`- Last used contact: ${lastContactPhone || 'none'}`)
+    console.log(`- Last used contact index: ${lastContactIndex !== null ? lastContactIndex : 'none'}`)
     
     // Log all contacts for this seller for debugging
     contacts.forEach((contact, index) => {
       const isSelected = index === nextContactIndex
-      const wasLast = contact.phone_number === lastContactPhone
+      const wasLast = lastContactIndex !== null && index === lastContactIndex
       console.log(`  Contact ${index}: ${contact.phone_number} ${isSelected ? '← SELECTED' : ''} ${wasLast ? '(was last)' : ''}`)
     })
 
@@ -323,8 +306,7 @@ serve(async (req) => {
         .from('clicks2')
         .insert({
           campaign_id: campaign.id,
-          seller_id: targetSeller.id,
-          contact_phone: targetContact.phone_number
+          seller_id: targetSeller.id
         })
       insertError = insertError2
     } else {
@@ -333,8 +315,7 @@ serve(async (req) => {
         .from('clicks')
         .insert({
           campaign_id: campaign.id,
-          seller_id: targetSeller.id,
-          contact_phone: targetContact.phone_number
+          seller_id: targetSeller.id
         })
       insertError = insertError1
     }
