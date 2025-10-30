@@ -70,7 +70,7 @@ export const Sellers = () => {
           name,
           weight,
           created_at,
-          seller_contacts (
+          seller_contacts2 (
             id,
             phone_number,
             description
@@ -79,10 +79,10 @@ export const Sellers = () => {
         .eq('team_id', team.id)
         .order('created_at', { ascending: false });
 
-      // Map seller_contacts to contacts to match our interface
+      // Map seller_contacts2 to contacts to match our interface
       const mappedSellers = sellersData?.map(seller => ({
         ...seller,
-        contacts: seller.seller_contacts || []
+        contacts: seller.seller_contacts2 || []
       })) || [];
 
       setSellers(mappedSellers);
