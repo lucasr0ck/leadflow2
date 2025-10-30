@@ -148,7 +148,8 @@ serve(async (req) => {
     const sellerClickCount = sellerClicks || 0
     
     // Step 7: Select the contact using round-robin within the seller's contacts
-    const contacts = targetSeller.seller_contacts
+    // Supabase retorna a relação como "seller_contacts2" após a mudança de tabela
+    const contacts = (targetSeller as any).seller_contacts2
     if (!contacts || contacts.length === 0) {
       console.error('No contacts found for seller:', targetSeller.id)
       return new Response(
@@ -160,8 +161,8 @@ serve(async (req) => {
       )
     }
 
-    const nextContactIndex = sellerClickCount % contacts.length
-    const targetContact = contacts[nextContactIndex]
+  const nextContactIndex = sellerClickCount % contacts.length
+  const targetContact = contacts[nextContactIndex]
 
     console.log(`Selected contact: ${targetContact.phone_number} (seller clicks: ${sellerClickCount}, contact index: ${nextContactIndex})`)
 
@@ -189,8 +190,10 @@ serve(async (req) => {
     logClick()
 
     // Step 9: Construct WhatsApp URL
-    const encodedMessage = encodeURIComponent(campaign.greeting_message || '')
-    const redirectUrl = `https://wa.me/${targetContact.phone_number}?text=${encodedMessage}`
+  const encodedMessage = encodeURIComponent(campaign.greeting_message || '')
+  // Sanitize phone number to keep only digits (format required by wa.me)
+  const sanitizedPhone = String(targetContact.phone_number).replace(/\D/g, '')
+  const redirectUrl = `https://wa.me/${sanitizedPhone}?text=${encodedMessage}`
 
     console.log(`Redirecting to: ${redirectUrl}`)
 
