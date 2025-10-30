@@ -81,19 +81,21 @@ export const CampaignCard = ({ campaign, onCampaignDeleted }: CampaignCardProps)
       // Use the new delete_campaign_and_children function
       const { data, error } = await supabase.rpc('delete_campaign_and_children', {
         campaign_id_to_delete: campaign.id
-      }) as { data: DeleteCampaignResponse[] | null; error: any };
+      }) as { data: any; error: any };
 
-      if (error || !data || data.length === 0 || !data[0].success) {
+      const payload: DeleteCampaignResponse | undefined = Array.isArray(data) ? data[0] : data;
+
+      if (error || !payload || payload.success !== true) {
         toast({
           title: "Erro",
-          description: data?.[0]?.message || "Não foi possível remover a campanha.",
+          description: payload?.message || "Não foi possível remover a campanha.",
           variant: "destructive",
         });
         return;
       }
 
-      const clicksDeleted = data[0].deleted_clicks_count || 0;
-      const linksDeleted = data[0].deleted_links_count || 0;
+      const clicksDeleted = payload.deleted_clicks_count || 0;
+      const linksDeleted = payload.deleted_links_count || 0;
       
       toast({
         title: "Sucesso",

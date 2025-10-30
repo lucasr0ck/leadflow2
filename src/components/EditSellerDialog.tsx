@@ -106,9 +106,12 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
       // Try to use the RPC function first
       const { data, error } = await supabase.rpc('delete_contact_and_links', {
         contact_id_to_delete: contactToDelete.id
-      }) as { data: DeleteContactResponse[] | null; error: any };
+      }) as { data: any; error: any };
 
-      if (error || !data || data.length === 0 || !data[0].success) {
+      // RPC pode devolver objeto único ou array
+      const payload: DeleteContactResponse | undefined = Array.isArray(data) ? data[0] : data;
+
+      if (error || !payload || payload.success !== true) {
         // If RPC fails, try direct deletion
         console.log('RPC function failed, trying direct deletion...');
         
@@ -132,7 +135,7 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
         });
       } else {
         // RPC function worked
-        const linksDeleted = data[0].deleted_links_count || 0;
+        const linksDeleted = payload.deleted_links_count || 0;
         toast({
           title: "Sucesso",
           description: `Contato removido com sucesso${linksDeleted > 0 ? ` (${linksDeleted} links de campanha também foram removidos)` : ''}.`,

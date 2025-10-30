@@ -117,19 +117,24 @@ export const Sellers = () => {
       // Use the new delete_seller_and_children function
       const { data, error } = await supabase.rpc('delete_seller_and_children', {
         seller_id_to_delete: sellerToDelete.id
-      }) as { data: DeleteSellerResponse[] | null; error: any };
+      }) as { data: any; error: any };
 
-      if (error || !data || data.length === 0 || !data[0].success) {
+      // A função RPC pode retornar um objeto único ou um array. Normalizamos aqui.
+      const payload: DeleteSellerResponse | undefined = Array.isArray(data)
+        ? data[0]
+        : data;
+
+      if (error || !payload || payload.success !== true) {
         toast({
           title: "Erro",
-          description: data?.[0]?.message || "Não foi possível remover o vendedor.",
+          description: payload?.message || "Não foi possível remover o vendedor.",
           variant: "destructive",
         });
         return;
       }
 
-      const contactsDeleted = data[0].deleted_contacts_count || 0;
-      const linksDeleted = data[0].deleted_links_count || 0;
+      const contactsDeleted = payload.deleted_contacts_count || 0;
+      const linksDeleted = payload.deleted_links_count || 0;
       
       toast({
         title: "Sucesso",
