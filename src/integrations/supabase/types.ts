@@ -59,6 +59,7 @@ export type Database = {
       campaigns: {
         Row: {
           created_at: string
+          full_slug: string
           greeting_message: string | null
           id: string
           is_active: boolean
@@ -68,6 +69,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          full_slug: string
           greeting_message?: string | null
           id?: string
           is_active?: boolean
@@ -77,6 +79,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          full_slug?: string
           greeting_message?: string | null
           id?: string
           is_active?: boolean
@@ -194,23 +197,70 @@ export type Database = {
           },
         ]
       }
-      teams: {
+      team_members: {
         Row: {
           created_at: string
           id: string
-          owner_id: string
-          team_name: string
+          joined_at: string
+          role: string
+          team_id: string
+          updated_at: string
+          user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
-          owner_id: string
-          team_name: string
+          joined_at?: string
+          role?: string
+          team_id: string
+          updated_at?: string
+          user_id: string
         }
         Update: {
           created_at?: string
           id?: string
+          joined_at?: string
+          role?: string
+          team_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          owner_id: string
+          slug: string
+          team_name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          owner_id: string
+          slug: string
+          team_name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
           owner_id?: string
+          slug?: string
           team_name?: string
         }
         Relationships: []
@@ -340,6 +390,35 @@ export type Database = {
           efficiency_score: number
           contacts_count: number
         }[]
+      }
+      get_user_teams: {
+        Args: {
+          user_id_param?: string
+        }
+        Returns: {
+          team_id: string
+          team_name: string
+          team_slug: string
+          description: string | null
+          role: string
+          is_active: boolean
+          member_count: number
+          joined_at: string
+        }[]
+      }
+      is_team_member: {
+        Args: {
+          team_id_param: string
+          user_id_param?: string
+        }
+        Returns: boolean
+      }
+      is_team_admin: {
+        Args: {
+          team_id_param: string
+          user_id_param?: string
+        }
+        Returns: boolean
       }
     }
     Enums: {
