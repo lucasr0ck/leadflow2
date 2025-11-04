@@ -18,6 +18,7 @@ interface CampaignData {
   id: string;
   name: string;
   slug: string;
+  full_slug: string;
   totalClicks: number;
   averageDailyClicks: number;
   chartData: Array<{
@@ -51,7 +52,7 @@ export const CampaignAnalytics = () => {
       // Get campaign basic info
       const { data: campaign } = await supabase
         .from('campaigns')
-        .select('id, name, slug')
+        .select('id, name, slug, full_slug')
         .eq('id', id)
         .single();
 
@@ -96,6 +97,7 @@ export const CampaignAnalytics = () => {
         id: campaign.id,
         name: campaign.name,
         slug: campaign.slug,
+        full_slug: campaign.full_slug,
         totalClicks,
         averageDailyClicks,
         chartData,

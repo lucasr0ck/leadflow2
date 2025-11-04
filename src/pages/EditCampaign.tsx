@@ -109,7 +109,7 @@ export const EditCampaign = () => {
       // Get user's team
       const { data: team } = await supabase
         .from('teams')
-        .select('id')
+        .select('id, slug')
         .eq('owner_id', user.id)
         .single();
 
@@ -122,12 +122,16 @@ export const EditCampaign = () => {
         return;
       }
 
+      // Generate full_slug: team-slug-campaign-slug
+      const fullSlug = `${team.slug}-${data.slug}`;
+
       // Update campaign
       const { error: campaignError } = await supabase
         .from('campaigns')
         .update({
           name: data.name,
           slug: data.slug,
+          full_slug: fullSlug,
           greeting_message: data.greeting_message,
         })
         .eq('id', id)

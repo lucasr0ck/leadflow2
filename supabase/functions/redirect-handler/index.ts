@@ -36,36 +36,14 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    console.log(`[${new Date().toISOString()}] Processing slug: ${slug}`)
+    console.log(`[${new Date().toISOString()}] Processing full_slug: ${slug}`)
 
-    // Determine which application by checking which table contains the campaign
-    let isLeadflow2 = false
-    let campaign = null
-    let campaignError = null
-
-    // First try campaigns2 table (leadflow2)
-    const { data: campaign2, error: campaignError2 } = await supabase
-      .from('campaigns2')
+    // Get campaign by full_slug (multi-tenant unified table)
+    const { data: campaign, error: campaignError } = await supabase
+      .from('campaigns')
       .select('id, greeting_message, team_id, is_active')
-      .eq('slug', slug)
+      .eq('full_slug', slug)
       .single()
-
-    if (campaign2) {
-      isLeadflow2 = true
-      campaign = campaign2
-      console.log(`Campaign found in campaigns2 - using LeadFlow2 tables`)
-    } else {
-      // Try original campaigns table (leadflow original)
-      const { data: campaignOriginal, error: campaignErrorOriginal } = await supabase
-        .from('campaigns')
-        .select('id, greeting_message, team_id, is_active')
-        .eq('slug', slug)
-        .single()
-      
-      campaign = campaignOriginal
-      campaignError = campaignErrorOriginal
-      console.log(`Campaign found in campaigns - using original tables`)
-    }
 
     if (campaignError || !campaign) {
       console.error('Campaign not found:', campaignError)
@@ -82,47 +60,21 @@ serve(async (req) => {
       )
     }
 
-    // Get sellers with contacts from correct tables
-    let sellers = null
-    let sellersError = null
-    
-    if (isLeadflow2) {
-      const { data: sellers2, error: sellersError2 } = await supabase
-        .from('sellers2')
-        .select(`
+    // Get sellers with contacts
+    const { data: sellers, error: sellersError } = await supabase
+      .from('sellers')
+      .select(`
+        id,
+        name,
+        weight,
+        seller_contacts (
           id,
-          name,
-          weight,
-          seller_contacts2 (
-            id,
-            phone_number,
-            description
-          )
-        `)
-        .eq('team_id', campaign.team_id)
-        .order('created_at', { ascending: true })
-
-      sellers = sellers2
-      sellersError = sellersError2
-    } else {
-      const { data: sellersOriginal, error: sellersErrorOriginal } = await supabase
-        .from('sellers')
-        .select(`
-          id,
-          name,
-          weight,
-          seller_contacts (
-            id,
-            phone_number,
-            description
-          )
-        `)
-        .eq('team_id', campaign.team_id)
-        .order('created_at', { ascending: true })
-      
-      sellers = sellersOriginal
-      sellersError = sellersErrorOriginal
-    }
+          phone_number,
+          description
+        )
+      `)
+      .eq('team_id', campaign.team_id)
+      .order('created_at', { ascending: true })
 
     if (sellersError || !sellers || sellers.length === 0) {
       console.error('No sellers found:', sellersError)
@@ -132,54 +84,31 @@ serve(async (req) => {
       )
     }
 
-    // Get total clicks for this campaign from correct table
-    let clickCount = 0
-    if (isLeadflow2) {
-      const { count: totalClicks2 } = await supabase
-        .from('clicks2')
-        .select('*', { count: 'exact', head: true })
-        .eq('campaign_id', campaign.id)
-      clickCount = totalClicks2 || 0
-    } else {
-      const { count: totalClicks } = await supabase
-        .from('clicks')
-        .select('*', { count: 'exact', head: true })
-        .eq('campaign_id', campaign.id)
-      clickCount = totalClicks || 0
-    }
+    // Get total clicks for this campaign
+    const { count: clickCount } = await supabase
+      .from('clicks')
+      .select('*', { count: 'exact', head: true })
+      .eq('campaign_id', campaign.id)
 
-    console.log(`Total clicks (${isLeadflow2 ? 'clicks2' : 'clicks'}): ${clickCount}`)
+    console.log(`Total clicks: ${clickCount || 0}`)
 
     // Simple round-robin: select seller by click count
-    const sellerIndex = clickCount % sellers.length
+    const sellerIndex = (clickCount || 0) % sellers.length
     const selectedSeller = sellers[sellerIndex]
     
     console.log(`Selected seller: ${selectedSeller.name} (index: ${sellerIndex}/${sellers.length})`)
 
-    // Get this seller's click count from correct table
-    let sellerClickCount = 0
-    if (isLeadflow2) {
-      const { count: sellerClicks2 } = await supabase
-        .from('clicks2')
-        .select('*', { count: 'exact', head: true })
-        .eq('campaign_id', campaign.id)
-        .eq('seller_id', selectedSeller.id)
-      sellerClickCount = sellerClicks2 || 0
-    } else {
-      const { count: sellerClicks } = await supabase
-        .from('clicks')
-        .select('*', { count: 'exact', head: true })
-        .eq('campaign_id', campaign.id)
-        .eq('seller_id', selectedSeller.id)
-      sellerClickCount = sellerClicks || 0
-    }
+    // Get this seller's click count
+    const { count: sellerClickCount } = await supabase
+      .from('clicks')
+      .select('*', { count: 'exact', head: true })
+      .eq('campaign_id', campaign.id)
+      .eq('seller_id', selectedSeller.id)
 
-    console.log(`Seller clicks: ${sellerClickCount}`)
+    console.log(`Seller clicks: ${sellerClickCount || 0}`)
 
     // Select contact by seller's click count
-    const contacts = isLeadflow2 ? 
-      (selectedSeller.seller_contacts2 || []) : 
-      (selectedSeller.seller_contacts || [])
+    const contacts = selectedSeller.seller_contacts || []
       
     if (contacts.length === 0) {
       return new Response(
@@ -188,35 +117,24 @@ serve(async (req) => {
       )
     }
 
-    const contactIndex = sellerClickCount % contacts.length
+    const contactIndex = (sellerClickCount || 0) % contacts.length
     const selectedContact = contacts[contactIndex]
     
     console.log(`Selected contact: ${selectedContact.phone_number} (index: ${contactIndex}/${contacts.length})`)
 
-    // Record the click in correct table
-    let insertError = null
-    if (isLeadflow2) {
-      const { error } = await supabase
-        .from('clicks2')
-        .insert({
-          campaign_id: campaign.id,
-          seller_id: selectedSeller.id
-        })
-      insertError = error
-    } else {
-      const { error } = await supabase
-        .from('clicks')
-        .insert({
-          campaign_id: campaign.id,
-          seller_id: selectedSeller.id
-        })
-      insertError = error
-    }
+    // Record the click
+    const { error: insertError } = await supabase
+      .from('clicks')
+      .insert({
+        campaign_id: campaign.id,
+        seller_id: selectedSeller.id,
+        team_id: campaign.team_id
+      })
 
     if (insertError) {
-      console.error(`Error recording click in ${isLeadflow2 ? 'clicks2' : 'clicks'}:`, insertError)
+      console.error('Error recording click:', insertError)
     } else {
-      console.log(`Click recorded successfully in ${isLeadflow2 ? 'clicks2' : 'clicks'}`)
+      console.log('Click recorded successfully')
     }
 
     // Generate WhatsApp URL

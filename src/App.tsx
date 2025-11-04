@@ -19,6 +19,7 @@ import { Analytics } from '@/pages/Analytics';
 import { CampaignAnalytics } from '@/pages/CampaignAnalytics';
 import { PublicRedirect } from '@/pages/PublicRedirect';
 import { AuditLogs } from '@/pages/AuditLogs';
+import { TeamManagement } from '@/pages/TeamManagement';
 import NotFound from "./pages/NotFound";
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 
@@ -179,6 +180,16 @@ const AppRoutes = () => {
         }
       >
         <Route index element={<AuditLogs />} />
+      </Route>
+      <Route
+        path="/settings/teams"
+        element={
+          <ProtectedRoute>
+            <MainLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<TeamManagement />} />
       </Route>
       {/* Public redirect route - no authentication required */}
       <Route path="/r/:slug" element={<PublicRedirect />} />

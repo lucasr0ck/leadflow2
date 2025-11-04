@@ -14,6 +14,7 @@ interface CampaignCardProps {
     id: string;
     name: string;
     slug: string;
+    full_slug: string;
     is_active: boolean;
     totalClicks: number;
     clicksLast7Days: number;
@@ -45,7 +46,7 @@ export const CampaignCard = ({ campaign, onCampaignDeleted }: CampaignCardProps)
     
     // Use absolute URL for production deployment
     const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
-    const redirectUrl = `${baseUrl}/r/${campaign.slug}`;
+    const redirectUrl = `${baseUrl}/r/${campaign.full_slug}`;
     
     try {
       await navigator.clipboard.writeText(redirectUrl);
@@ -175,7 +176,7 @@ export const CampaignCard = ({ campaign, onCampaignDeleted }: CampaignCardProps)
               <p className="text-xs font-medium text-slate-600">Link de Redirecionamento:</p>
               <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
                 <code className="flex-1 text-xs text-slate-700 truncate">
-                  /r/{campaign.slug}
+                  /r/{campaign.full_slug}
                 </code>
                 <Button
                   size="sm"

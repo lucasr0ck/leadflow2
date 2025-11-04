@@ -15,6 +15,7 @@ interface Campaign {
   id: string;
   name: string;
   slug: string;
+  full_slug: string;
   is_active: boolean;
   totalClicks: number;
   clicksLast7Days: number;
@@ -61,6 +62,7 @@ export const Campaigns = () => {
           id,
           name,
           slug,
+          full_slug,
           is_active,
           team_id
         `)
@@ -101,6 +103,7 @@ export const Campaigns = () => {
             id: campaign.id,
             name: campaign.name,
             slug: campaign.slug,
+            full_slug: campaign.full_slug,
             is_active: campaign.is_active,
             totalClicks: totalClicksData?.length || 0,
             clicksLast7Days: recentClicksData?.length || 0,

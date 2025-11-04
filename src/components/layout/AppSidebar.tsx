@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, Users, Megaphone, LogOut, TrendingUp, FileText, Building2, ChevronDown } from 'lucide-react';
+import { BarChart3, Users, Megaphone, LogOut, TrendingUp, FileText, Building2, Settings, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTeam } from '@/contexts/TeamContext';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,10 @@ const navigation = [
   { name: 'Campanhas', href: '/campaigns', icon: Megaphone },
   { name: 'Analytics', href: '/analytics', icon: TrendingUp },
   { name: 'Logs de Auditoria', href: '/audit-logs', icon: FileText },
+];
+
+const settingsNavigation = [
+  { name: 'Gerenciar Operações', href: '/settings/teams', icon: Building2 },
 ];
 
 export const AppSidebar = () => {
@@ -86,6 +90,24 @@ export const AppSidebar = () => {
           <SidebarGroupContent>
             <SidebarMenu>
               {navigation.map((item) => (
+                <SidebarMenuItem key={item.name}>
+                  <SidebarMenuButton asChild isActive={isActive(item.href)}>
+                    <Link to={item.href}>
+                      <item.icon className="w-4 h-4" />
+                      <span>{item.name}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Configurações</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {settingsNavigation.map((item) => (
                 <SidebarMenuItem key={item.name}>
                   <SidebarMenuButton asChild isActive={isActive(item.href)}>
                     <Link to={item.href}>

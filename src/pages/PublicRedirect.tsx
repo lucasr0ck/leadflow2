@@ -1,10 +1,12 @@
 
 import { useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
 export const PublicRedirect = () => {
+  // slug format: "team-slug-campaign-slug" (full_slug from campaigns table)
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (slug) {
