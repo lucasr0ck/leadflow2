@@ -5,12 +5,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { SellerFormData } from '@/components/seller/SellerForm';
+import { useAuditLog } from '@/hooks/useAuditLog';
 
 export const useSellerOperations = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { logAudit } = useAuditLog();
 
   const createSeller = async (data: SellerFormData) => {
     if (!user) return;
@@ -20,7 +22,7 @@ export const useSellerOperations = () => {
 
       // Get user's team
       const { data: team } = await supabase
-        .from('teams2')
+        .from('teams')
         .select('id')
         .eq('owner_id', user.id)
         .single();
@@ -36,7 +38,7 @@ export const useSellerOperations = () => {
 
       // Create seller
       const { data: seller, error: sellerError } = await supabase
-        .from('sellers2')
+        .from('sellers')
         .insert({
           name: data.name,
           team_id: team.id,
@@ -63,7 +65,7 @@ export const useSellerOperations = () => {
       }));
 
       const { error: contactsError } = await supabase
-        .from('seller_contacts2')
+        .from('seller_contacts')
         .insert(contacts);
 
       if (contactsError) {
@@ -75,6 +77,22 @@ export const useSellerOperations = () => {
         });
         return;
       }
+
+      // Log seller creation audit
+      await logAudit({
+        action_type: 'create',
+        entity_type: 'seller',
+        entity_id: seller.id,
+        new_value: {
+          name: seller.name,
+          weight: seller.weight,
+          contacts_count: contacts.length,
+        },
+        metadata: {
+          seller_name: seller.name,
+          team_id: team.id,
+        }
+      });
 
       toast({
         title: "Sucesso",

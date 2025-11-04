@@ -38,7 +38,7 @@ export const Dashboard = () => {
     try {
       // Get user's team
       const { data: team } = await supabase
-        .from('teams2')
+        .from('teams')
         .select('id')
         .eq('owner_id', user!.id)
         .single();
@@ -47,7 +47,7 @@ export const Dashboard = () => {
 
       // Fetch stats
       const [sellersRes, campaignsRes, clicksRes] = await Promise.all([
-        supabase.from('sellers2').select('id').eq('team_id', team.id),
+        supabase.from('sellers').select('id').eq('team_id', team.id),
         supabase.from('campaigns2').select('id').eq('team_id', team.id),
         supabase
           .from('clicks2')

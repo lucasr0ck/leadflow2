@@ -17,6 +17,7 @@ import { EditCampaign } from '@/pages/EditCampaign';
 import { Analytics } from '@/pages/Analytics';
 import { CampaignAnalytics } from '@/pages/CampaignAnalytics';
 import { PublicRedirect } from '@/pages/PublicRedirect';
+import { AuditLogs } from '@/pages/AuditLogs';
 import NotFound from "./pages/NotFound";
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 
@@ -168,6 +169,16 @@ const AppRoutes = () => {
           <CampaignAnalytics />
         }
       />
+      <Route
+        path="/audit-logs"
+        element={
+          <ProtectedRoute>
+            <MainLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<AuditLogs />} />
+      </Route>
       {/* Public redirect route - no authentication required */}
       <Route path="/r/:slug" element={<PublicRedirect />} />
       <Route path="*" element={<NotFound />} />

@@ -36,10 +36,10 @@ export const SellerPerformanceCard = ({ campaignId, startDate, endDate }: Seller
             created_at,
             campaign_links (
               contact_id,
-              seller_contacts2 (
+              seller_contacts (
                 phone_number,
                 description,
-                sellers2 (
+                sellers (
                   name
                 )
               )

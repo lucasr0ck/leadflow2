@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { EditSellerDialog } from '@/components/EditSellerDialog';
 import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { useAuditLog } from '@/hooks/useAuditLog';
 
 interface Seller {
   id: string;
@@ -55,7 +56,7 @@ export const Sellers = () => {
       
       // Get user's team
       const { data: team } = await supabase
-        .from('teams2')
+        .from('teams')
         .select('id')
         .eq('owner_id', user!.id)
         .single();
@@ -64,13 +65,13 @@ export const Sellers = () => {
 
       // Fetch sellers with their contacts
       const { data: sellersData } = await supabase
-        .from('sellers2')
+        .from('sellers')
         .select(`
           id,
           name,
           weight,
           created_at,
-          seller_contacts2 (
+          seller_contacts (
             id,
             phone_number,
             description
@@ -79,10 +80,10 @@ export const Sellers = () => {
         .eq('team_id', team.id)
         .order('created_at', { ascending: false });
 
-      // Map seller_contacts2 to contacts to match our interface
+      // Map seller_contacts to contacts to match our interface
       const mappedSellers = sellersData?.map(seller => ({
         ...seller,
-        contacts: seller.seller_contacts2 || []
+        contacts: seller.seller_contacts || []
       })) || [];
 
       setSellers(mappedSellers);
@@ -156,10 +157,16 @@ export const Sellers = () => {
     }
   };
 
+  const { logAudit } = useAuditLog();
+
   const updateSellerWeight = async (sellerId: string, newWeight: number) => {
     try {
+      // Get old weight before update
+      const oldSeller = sellers.find(s => s.id === sellerId);
+      const oldWeight = oldSeller?.weight || 0;
+
       const { error } = await supabase
-        .from('sellers2')
+        .from('sellers')
         .update({ weight: newWeight })
         .eq('id', sellerId);
 
@@ -171,6 +178,19 @@ export const Sellers = () => {
         });
         return;
       }
+
+      // Log the weight change
+      await logAudit({
+        action_type: 'update',
+        entity_type: 'seller',
+        entity_id: sellerId,
+        old_value: { weight: oldWeight },
+        new_value: { weight: newWeight },
+        metadata: {
+          seller_name: oldSeller?.name,
+          field_changed: 'weight'
+        }
+      });
 
       // Update local state
       setSellers(prev => prev.map(seller => 

@@ -49,7 +49,7 @@ export const Campaigns = () => {
       
       // Get user's team
       const { data: team } = await supabase
-        .from('teams2')
+        .from('teams')
         .select('id')
         .eq('owner_id', user!.id)
         .single();
@@ -90,7 +90,7 @@ export const Campaigns = () => {
 
           // Get sellers for this team with their weights (dynamic distribution)
           const { data: sellersData } = await supabase
-            .from('sellers2')
+            .from('sellers')
             .select('name, weight')
             .eq('team_id', team.id);
 

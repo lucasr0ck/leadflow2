@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          id: string
+          user_id: string | null
+          action_type: string
+          entity_type: string | null
+          entity_id: string | null
+          old_value: Json | null
+          new_value: Json | null
+          user_agent: string | null
+          ip_address: string | null
+          metadata: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          action_type: string
+          entity_type?: string | null
+          entity_id?: string | null
+          old_value?: Json | null
+          new_value?: Json | null
+          user_agent?: string | null
+          ip_address?: string | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          action_type?: string
+          entity_type?: string | null
+          entity_id?: string | null
+          old_value?: Json | null
+          new_value?: Json | null
+          user_agent?: string | null
+          ip_address?: string | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       campaigns: {
         Row: {
           created_at: string
@@ -225,6 +267,78 @@ export type Database = {
           link_id: string
           whatsapp_url: string
           campaign_id: string
+        }[]
+      }
+      get_campaign_analytics: {
+        Args: { 
+          team_id_param: string
+          start_date: string
+          end_date: string
+        }
+        Returns: {
+          campaign_id: string
+          campaign_name: string
+          campaign_slug: string
+          total_clicks: number
+        }[]
+      }
+      get_seller_analytics: {
+        Args: { 
+          team_id_param: string
+          start_date: string
+          end_date: string
+        }
+        Returns: {
+          seller_id: string
+          seller_name: string
+          total_clicks: number
+          contacts_count: number
+        }[]
+      }
+      get_daily_clicks: {
+        Args: { 
+          team_id_param: string
+          start_date: string
+          end_date: string
+        }
+        Returns: {
+          click_date: string
+          total_clicks: number
+        }[]
+      }
+      get_total_clicks: {
+        Args: { 
+          team_id_param: string
+          start_date: string
+          end_date: string
+        }
+        Returns: number
+      }
+      get_analytics_comparison: {
+        Args: { 
+          team_id_param: string
+          start_date: string
+          end_date: string
+        }
+        Returns: {
+          current_period_clicks: number
+          previous_period_clicks: number
+          growth_percentage: number
+        }[]
+      }
+      get_seller_performance: {
+        Args: { 
+          team_id_param: string
+          start_date: string
+          end_date: string
+        }
+        Returns: {
+          seller_id: string
+          seller_name: string
+          seller_weight: number
+          total_clicks: number
+          efficiency_score: number
+          contacts_count: number
         }[]
       }
     }

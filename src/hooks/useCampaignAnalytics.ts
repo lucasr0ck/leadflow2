@@ -26,7 +26,7 @@ export const useCampaignAnalytics = (campaignId: string) => {
     try {
       // Get total clicks
       const { data: totalClicksData } = await supabase
-        .from('clicks2')
+        .from('clicks')
         .select('id')
         .eq('campaign_id', campaignId);
 
@@ -35,7 +35,7 @@ export const useCampaignAnalytics = (campaignId: string) => {
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
       const { data: last7DaysData } = await supabase
-        .from('clicks2')
+        .from('clicks')
         .select('id')
         .eq('campaign_id', campaignId)
         .gte('created_at', sevenDaysAgo.toISOString());

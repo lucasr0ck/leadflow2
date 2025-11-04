@@ -2,20 +2,26 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { startOfDay, endOfDay, format } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface AnalyticsData {
   totalClicks: number;
+  previousPeriodClicks: number;
+  growthPercentage: number;
   campaignStats: Array<{
+    campaign_id: string;
     campaign_name: string;
+    campaign_slug: string;
     clicks: number;
-    slug: string;
   }>;
   sellerStats: Array<{
+    seller_id: string;
     seller_name: string;
     clicks: number;
     contacts: number;
+    efficiency_score?: number;
+    weight?: number;
   }>;
   dailyClicks: Array<{
     date: string;
@@ -32,11 +38,14 @@ export const useAnalytics = (dateRange: DateRange) => {
   const { user } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsData>({
     totalClicks: 0,
+    previousPeriodClicks: 0,
+    growthPercentage: 0,
     campaignStats: [],
     sellerStats: [],
     dailyClicks: []
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -46,117 +55,120 @@ export const useAnalytics = (dateRange: DateRange) => {
 
   const fetchAnalytics = async () => {
     setLoading(true);
+    setError(null);
+    
     try {
-      const { data: team } = await supabase
-        .from('teams2')
+      // Get user's team
+      const { data: team, error: teamError } = await supabase
+        .from('teams')
         .select('id')
         .eq('owner_id', user!.id)
         .single();
 
-      if (!team) return;
+      if (teamError || !team) {
+        throw new Error('Time não encontrado');
+      }
 
-      // Buscar cliques no período
-      const { data: clicksData } = await supabase
-        .from('clicks2')
-        .select(`
-          id,
-          created_at,
-          campaign_id,
-          seller_id,
-          campaigns2!inner (
-            name,
-            slug,
-            team_id
-          ),
-          sellers2!inner (
-            name
-          )
-        `)
-        .eq('campaigns2.team_id', team.id)
-        .gte('created_at', dateRange.start.toISOString())
-        .lte('created_at', dateRange.end.toISOString())
-        .order('created_at', { ascending: false });
+      // Use RPC functions for optimized queries (no 1000 row limit!)
+      const startDate = dateRange.start.toISOString();
+      const endDate = dateRange.end.toISOString();
 
-      const clicks = clicksData || [];
-
-      // Processar dados para analytics
-      const totalClicks = clicks.length;
-
-      // Stats por campanha
-      const campaignMap = new Map<string, { name: string; slug: string; clicks: number }>();
-      clicks.forEach(click => {
-        const campaignId = click.campaign_id;
-        const campaignName = click.campaigns.name;
-        const campaignSlug = click.campaigns.slug;
+      // Fetch all analytics data in parallel
+      const [
+        totalClicksResult,
+        comparisonResult,
+        campaignStatsResult,
+        sellerPerformanceResult,
+        dailyClicksResult
+      ] = await Promise.all([
+        // Total clicks (single number, very fast)
+        supabase.rpc('get_total_clicks', {
+          team_id_param: team.id,
+          start_date: startDate,
+          end_date: endDate
+        }),
         
-        if (campaignMap.has(campaignId)) {
-          campaignMap.get(campaignId)!.clicks++;
-        } else {
-          campaignMap.set(campaignId, {
-            name: campaignName,
-            slug: campaignSlug,
-            clicks: 1
-          });
-        }
-      });
-
-      const campaignStats = Array.from(campaignMap.values()).map(c => ({
-        campaign_name: c.name,
-        clicks: c.clicks,
-        slug: c.slug
-      })).sort((a, b) => b.clicks - a.clicks);
-
-      // Stats por vendedor
-      const sellerMap = new Map<string, { name: string; clicks: number; contacts: Set<string> }>();
-      clicks.forEach(click => {
-        const sellerName = click.sellers.name;
-        const sellerId = click.seller_id;
+        // Comparison with previous period
+        supabase.rpc('get_analytics_comparison', {
+          team_id_param: team.id,
+          start_date: startDate,
+          end_date: endDate
+        }),
         
-        if (sellerMap.has(sellerName)) {
-          sellerMap.get(sellerName)!.clicks++;
-          sellerMap.get(sellerName)!.contacts.add(sellerId);
-        } else {
-          sellerMap.set(sellerName, {
-            name: sellerName,
-            clicks: 1,
-            contacts: new Set([sellerId])
-          });
-        }
-      });
+        // Campaign statistics (aggregated)
+        supabase.rpc('get_campaign_analytics', {
+          team_id_param: team.id,
+          start_date: startDate,
+          end_date: endDate
+        }),
+        
+        // Seller performance with efficiency scores
+        supabase.rpc('get_seller_performance', {
+          team_id_param: team.id,
+          start_date: startDate,
+          end_date: endDate
+        }),
+        
+        // Daily clicks aggregation
+        supabase.rpc('get_daily_clicks', {
+          team_id_param: team.id,
+          start_date: startDate,
+          end_date: endDate
+        })
+      ]);
 
-      const sellerStats = Array.from(sellerMap.values()).map(s => ({
-        seller_name: s.name,
-        clicks: s.clicks,
-        contacts: s.contacts.size
-      })).sort((a, b) => b.clicks - a.clicks);
+      // Check for errors
+      if (totalClicksResult.error) throw totalClicksResult.error;
+      if (comparisonResult.error) throw comparisonResult.error;
+      if (campaignStatsResult.error) throw campaignStatsResult.error;
+      if (sellerPerformanceResult.error) throw sellerPerformanceResult.error;
+      if (dailyClicksResult.error) throw dailyClicksResult.error;
 
-      // Cliques diários
-      const dailyMap = new Map<string, number>();
-      clicks.forEach(click => {
-        const date = format(new Date(click.created_at), 'yyyy-MM-dd');
-        dailyMap.set(date, (dailyMap.get(date) || 0) + 1);
-      });
+      // Process comparison data
+      const comparison = Array.isArray(comparisonResult.data) 
+        ? comparisonResult.data[0] 
+        : comparisonResult.data;
 
-      const dailyClicks = Array.from(dailyMap.entries())
-        .map(([date, clicks]) => ({
-          date: format(new Date(date), 'dd/MM', { locale: ptBR }),
-          clicks
-        }))
-        .sort((a, b) => a.date.localeCompare(b.date));
+      // Process campaign stats
+      const campaignStats = (campaignStatsResult.data || []).map((stat: any) => ({
+        campaign_id: stat.campaign_id,
+        campaign_name: stat.campaign_name,
+        campaign_slug: stat.campaign_slug,
+        clicks: Number(stat.total_clicks)
+      }));
+
+      // Process seller stats with efficiency scores
+      const sellerStats = (sellerPerformanceResult.data || []).map((stat: any) => ({
+        seller_id: stat.seller_id,
+        seller_name: stat.seller_name,
+        clicks: Number(stat.total_clicks),
+        contacts: Number(stat.contacts_count),
+        efficiency_score: Number(stat.efficiency_score),
+        weight: Number(stat.seller_weight)
+      }));
+
+      // Process daily clicks
+      const dailyClicks = (dailyClicksResult.data || []).map((stat: any) => ({
+        date: format(new Date(stat.click_date), 'dd/MM', { locale: ptBR }),
+        clicks: Number(stat.total_clicks)
+      }));
 
       setAnalytics({
-        totalClicks,
+        totalClicks: Number(totalClicksResult.data || 0),
+        previousPeriodClicks: Number(comparison?.previous_period_clicks || 0),
+        growthPercentage: Number(comparison?.growth_percentage || 0),
         campaignStats,
         sellerStats,
         dailyClicks
       });
 
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
+    } catch (err: any) {
+      console.error('Error fetching analytics:', err);
+      setError(err.message || 'Erro ao carregar analytics');
     } finally {
       setLoading(false);
     }
   };
 
-  return { analytics, loading };
+  return { analytics, loading, error, refetch: fetchAnalytics };
 };

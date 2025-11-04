@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuditLog } from '@/hooks/useAuditLog';
 
 interface AuthContextType {
   user: User | null;
@@ -17,6 +18,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const { logAudit } = useAuditLog();
 
   useEffect(() => {
     console.log('AuthProvider: Initializing authentication...');
@@ -24,11 +26,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // Set up auth state listener FIRST
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        (event, session) => {
+        async (event, session) => {
           console.log('Auth state change:', event, session?.user?.email);
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
+
+          // Log authentication events
+          if (event === 'SIGNED_IN' && session?.user) {
+            await logAudit({
+              action_type: 'login',
+              metadata: {
+                email: session.user.email,
+                event: event,
+              }
+            });
+          } else if (event === 'SIGNED_OUT') {
+            await logAudit({
+              action_type: 'logout',
+              metadata: {
+                event: event,
+              }
+            });
+          }
         }
       );
 
@@ -59,6 +79,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email,
         password,
       });
+      
+      if (!error) {
+        // The audit log will be created by the onAuthStateChange listener
+        console.log('Login successful');
+      }
+      
       return { error };
     } catch (error) {
       console.error('Sign in error:', error);
@@ -68,6 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
+      // The audit log will be created by the onAuthStateChange listener
       await supabase.auth.signOut();
     } catch (error) {
       console.error('Sign out error:', error);

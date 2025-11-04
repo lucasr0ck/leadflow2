@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, Users, Megaphone, LogOut, TrendingUp } from 'lucide-react';
+import { BarChart3, Users, Megaphone, LogOut, TrendingUp, FileText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,6 +22,7 @@ const navigation = [
   { name: 'Vendedores', href: '/sellers', icon: Users },
   { name: 'Campanhas', href: '/campaigns', icon: Megaphone },
   { name: 'Analytics', href: '/analytics', icon: TrendingUp },
+  { name: 'Logs de Auditoria', href: '/audit-logs', icon: FileText },
 ];
 
 export const AppSidebar = () => {
