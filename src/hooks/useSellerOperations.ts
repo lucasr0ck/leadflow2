@@ -3,45 +3,31 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTeam } from '@/contexts/TeamContext';
 import { useToast } from '@/hooks/use-toast';
 import { SellerFormData } from '@/components/seller/SellerForm';
 import { useAuditLog } from '@/hooks/useAuditLog';
 
 export const useSellerOperations = () => {
   const { user } = useAuth();
+  const { currentTeam } = useTeam();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { logAudit } = useAuditLog();
 
   const createSeller = async (data: SellerFormData) => {
-    if (!user) return;
+    if (!user || !currentTeam) return;
 
     try {
       setIsSubmitting(true);
-
-      // Get user's team
-      const { data: team } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('owner_id', user.id)
-        .single();
-
-      if (!team) {
-        toast({
-          title: "Erro",
-          description: "Time não encontrado.",
-          variant: "destructive",
-        });
-        return;
-      }
 
       // Create seller
       const { data: seller, error: sellerError } = await supabase
         .from('sellers')
         .insert({
           name: data.name,
-          team_id: team.id,
+          team_id: currentTeam.team_id,
           weight: 1,
         })
         .select()
@@ -90,7 +76,7 @@ export const useSellerOperations = () => {
         },
         metadata: {
           seller_name: seller.name,
-          team_id: team.id,
+          team_id: currentTeam.team_id,
         }
       });
 

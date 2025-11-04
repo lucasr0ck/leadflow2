@@ -4,6 +4,7 @@ import { Plus, Trash2, Edit } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTeam } from '@/contexts/TeamContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +36,7 @@ interface DeleteSellerResponse {
 
 export const Sellers = () => {
   const { user } = useAuth();
+  const { currentTeam } = useTeam();
   const { toast } = useToast();
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,25 +47,21 @@ export const Sellers = () => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    if (user) {
+    if (user && currentTeam) {
       fetchSellers();
     }
-  }, [user]);
+  }, [user, currentTeam]);
 
   const fetchSellers = async () => {
+    if (!currentTeam) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      
-      // Get user's team
-      const { data: team } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('owner_id', user!.id)
-        .single();
 
-      if (!team) return;
-
-      // Fetch sellers with their contacts
+      // Fetch sellers with their contacts using currentTeam
       const { data: sellersData } = await supabase
         .from('sellers')
         .select(`
@@ -77,7 +75,7 @@ export const Sellers = () => {
             description
           )
         `)
-        .eq('team_id', team.id)
+        .eq('team_id', currentTeam.team_id)
         .order('created_at', { ascending: false });
 
       // Map seller_contacts to contacts to match our interface

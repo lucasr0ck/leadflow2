@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTeam } from '@/contexts/TeamContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -23,6 +24,7 @@ type CampaignFormData = z.infer<typeof campaignSchema>;
 
 export const CreateCampaign = () => {
   const { user } = useAuth();
+  const { currentTeam } = useTeam();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -37,35 +39,23 @@ export const CreateCampaign = () => {
   });
 
   const onSubmit = async (data: CampaignFormData) => {
-    if (!user) return;
+    if (!user || !currentTeam) return;
 
     try {
       setIsSubmitting(true);
 
-      // Get user's team
-      const { data: team } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('owner_id', user.id)
-        .single();
-
-      if (!team) {
-        toast({
-          title: "Erro",
-          description: "Time não encontrado.",
-          variant: "destructive",
-        });
-        return;
-      }
+      // Generate full_slug with team prefix
+      const fullSlug = `${currentTeam.team_slug}-${data.slug}`;
 
       // Create campaign
       const { data: campaign, error: campaignError } = await supabase
-        .from('campaigns2')
+        .from('campaigns')
         .insert({
           name: data.name,
           slug: data.slug,
+          full_slug: fullSlug,
           greeting_message: data.greeting_message,
-          team_id: team.id,
+          team_id: currentTeam.team_id,
           is_active: true,
         })
         .select()

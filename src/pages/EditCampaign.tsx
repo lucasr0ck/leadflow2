@@ -67,7 +67,7 @@ export const EditCampaign = () => {
 
       // Fetch campaign data
       const { data: campaign, error: campaignError } = await supabase
-        .from('campaigns2')
+        .from('campaigns')
         .select('id, name, slug, greeting_message')
         .eq('id', id)
         .eq('team_id', team.id)
@@ -124,7 +124,7 @@ export const EditCampaign = () => {
 
       // Update campaign
       const { error: campaignError } = await supabase
-        .from('campaigns2')
+        .from('campaigns')
         .update({
           name: data.name,
           slug: data.slug,

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTeam } from '@/contexts/TeamContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format, subDays, startOfDay } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +21,7 @@ interface ChartData {
 
 export const Dashboard = () => {
   const { user } = useAuth();
+  const { currentTeam } = useTeam();
   const [stats, setStats] = useState<DashboardStats>({
     activeSellers: 0,
     activeCampaigns: 0,
@@ -29,31 +31,25 @@ export const Dashboard = () => {
   const [recentCampaigns, setRecentCampaigns] = useState<any[]>([]);
 
   useEffect(() => {
-    if (user) {
+    if (user && currentTeam) {
       fetchDashboardData();
     }
-  }, [user]);
+  }, [user, currentTeam]);
 
   const fetchDashboardData = async () => {
+    if (!currentTeam) return;
+    
     try {
-      // Get user's team
-      const { data: team } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('owner_id', user!.id)
-        .single();
-
-      if (!team) return;
 
       // Fetch stats
       const [sellersRes, campaignsRes, clicksRes] = await Promise.all([
-        supabase.from('sellers').select('id').eq('team_id', team.id),
-        supabase.from('campaigns2').select('id').eq('team_id', team.id),
+        supabase.from('sellers').select('id').eq('team_id', currentTeam.team_id),
+        supabase.from('campaigns').select('id').eq('team_id', currentTeam.team_id),
         supabase
-          .from('clicks2')
-          .select('id, campaign_id, campaigns2!inner(team_id)')
+          .from('clicks')
+          .select('id, campaign_id, campaigns!inner(team_id)')
           .gte('created_at', startOfDay(new Date()).toISOString())
-          .eq('campaigns2.team_id', team.id),
+          .eq('campaigns.team_id', currentTeam.team_id),
       ]);
 
       setStats({
@@ -70,11 +66,11 @@ export const Dashboard = () => {
         
         chartPromises.push(
           supabase
-            .from('clicks2')
-            .select('id, campaign_id, campaigns2!inner(team_id)')
+            .from('clicks')
+            .select('id, campaign_id, campaigns!inner(team_id)')
             .gte('created_at', startOfDay(date).toISOString())
             .lt('created_at', startOfDay(subDays(date, -1)).toISOString())
-            .eq('campaigns2.team_id', team.id)
+            .eq('campaigns.team_id', currentTeam.team_id)
             .then(res => ({
               date: format(date, 'MM/dd'),
               clicks: res.data?.length || 0,
@@ -87,15 +83,15 @@ export const Dashboard = () => {
 
       // Fetch recent campaigns
       const { data: campaigns } = await supabase
-        .from('campaigns2')
+        .from('campaigns')
         .select(`
           id,
           name,
           slug,
           created_at,
-          clicks2(count)
+          clicks(count)
         `)
-        .eq('team_id', team.id)
+        .eq('team_id', currentTeam.team_id)
         .order('created_at', { ascending: false })
         .limit(5);
 

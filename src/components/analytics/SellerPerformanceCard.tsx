@@ -30,7 +30,7 @@ export const SellerPerformanceCard = ({ campaignId, startDate, endDate }: Seller
         setLoading(true);
         
         const { data: clicksData } = await supabase
-          .from('clicks2')
+          .from('clicks')
           .select(`
             campaign_link_id,
             created_at,

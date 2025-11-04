@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTeam } from '@/contexts/TeamContext';
 import { CampaignCard } from '@/components/campaigns/CampaignCard';
 import { Button } from '@/components/ui/button';
 import { subDays, startOfDay } from 'date-fns';
@@ -25,14 +26,15 @@ interface Campaign {
 
 export const Campaigns = () => {
   const { user } = useAuth();
+  const { currentTeam } = useTeam();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
+    if (user && currentTeam) {
       initializeData();
     }
-  }, [user]);
+  }, [user, currentTeam]);
 
   const initializeData = async () => {
     // Perform one-time authorized data cleanup
@@ -44,21 +46,17 @@ export const Campaigns = () => {
   };
 
   const fetchCampaigns = async () => {
+    if (!currentTeam) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      
-      // Get user's team
-      const { data: team } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('owner_id', user!.id)
-        .single();
-
-      if (!team) return;
 
       // Fetch campaigns with basic data - seller distribution is now dynamic
       const { data: campaignsData } = await supabase
-        .from('campaigns2')
+        .from('campaigns')
         .select(`
           id,
           name,
@@ -66,7 +64,7 @@ export const Campaigns = () => {
           is_active,
           team_id
         `)
-        .eq('team_id', team.id)
+        .eq('team_id', currentTeam.team_id)
         .order('created_at', { ascending: false });
 
       if (!campaignsData) return;
@@ -76,14 +74,14 @@ export const Campaigns = () => {
         campaignsData.map(async (campaign) => {
           // Get total clicks
           const { data: totalClicksData } = await supabase
-            .from('clicks2')
+            .from('clicks')
             .select('id')
             .eq('campaign_id', campaign.id);
 
           // Get clicks from last 7 days
           const sevenDaysAgo = startOfDay(subDays(new Date(), 7));
           const { data: recentClicksData } = await supabase
-            .from('clicks2')
+            .from('clicks')
             .select('id')
             .eq('campaign_id', campaign.id)
             .gte('created_at', sevenDaysAgo.toISOString());
@@ -92,7 +90,7 @@ export const Campaigns = () => {
           const { data: sellersData } = await supabase
             .from('sellers')
             .select('name, weight')
-            .eq('team_id', team.id);
+            .eq('team_id', currentTeam.team_id);
 
           const sellers = sellersData?.map(seller => ({
             name: seller.name,
