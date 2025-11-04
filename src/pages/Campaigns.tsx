@@ -8,7 +8,6 @@ import { useTeam } from '@/contexts/TeamContext';
 import { CampaignCard } from '@/components/campaigns/CampaignCard';
 import { Button } from '@/components/ui/button';
 import { subDays, startOfDay } from 'date-fns';
-import { performDataCleanup } from '@/utils/dataCleanup';
 import { PageHeader } from '@/components/layout/PageHeader';
 
 interface Campaign {
@@ -33,18 +32,9 @@ export const Campaigns = () => {
 
   useEffect(() => {
     if (user && currentTeam) {
-      initializeData();
+      fetchCampaigns();
     }
   }, [user, currentTeam]);
-
-  const initializeData = async () => {
-    // Perform one-time authorized data cleanup
-    console.log('Performing authorized data cleanup...');
-    await performDataCleanup();
-    
-    // Then fetch campaigns
-    fetchCampaigns();
-  };
 
   const fetchCampaigns = async () => {
     if (!currentTeam) {
