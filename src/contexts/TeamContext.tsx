@@ -44,11 +44,23 @@ export function TeamProvider({ children }: TeamProviderProps) {
 
       if (error) {
         console.error('Erro ao carregar teams:', error);
-        toast({
-          title: "Erro ao carregar operações",
-          description: error.message,
-          variant: "destructive",
-        });
+        
+        // Se a função não existe, significa que as migrations não foram executadas
+        if (error.message?.includes('function') || error.message?.includes('does not exist')) {
+          toast({
+            title: "⚠️ Migrations não executadas",
+            description: "Execute as migrations do Supabase antes de usar a aplicação. Veja DEPLOY_EASYPANEL.md",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Erro ao carregar operações",
+            description: error.message,
+            variant: "destructive",
+          });
+        }
+        setAvailableTeams([]);
+        setCurrentTeam(null);
         setLoading(false);
         return;
       }

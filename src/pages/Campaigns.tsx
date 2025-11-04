@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTeam } from '@/contexts/TeamContext';
 import { CampaignCard } from '@/components/campaigns/CampaignCard';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { subDays, startOfDay } from 'date-fns';
 import { PageHeader } from '@/components/layout/PageHeader';
 
@@ -26,15 +27,17 @@ interface Campaign {
 
 export const Campaigns = () => {
   const { user } = useAuth();
-  const { currentTeam } = useTeam();
+  const { currentTeam, loading: teamLoading, availableTeams } = useTeam();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user && currentTeam) {
       fetchCampaigns();
+    } else if (!teamLoading) {
+      setLoading(false);
     }
-  }, [user, currentTeam]);
+  }, [user, currentTeam, teamLoading]);
 
   const fetchCampaigns = async () => {
     if (!currentTeam) {
@@ -110,18 +113,42 @@ export const Campaigns = () => {
     }
   };
 
-  if (loading) {
+  // Mostrar loading apenas se team está carregando ou campaigns estão carregando
+  if (loading || teamLoading) {
+    return (
+      <div className="space-y-8">
+        <div className="flex justify-between items-center">
+          <PageHeader
+            title="Campanhas"
+            description="Gerencie suas campanhas de distribuição de leads"
+          />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-64 bg-muted/20 animate-pulse rounded-lg" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Se não tem team, mostrar mensagem
+  if (!currentTeam) {
     return (
       <div className="space-y-8">
         <PageHeader
           title="Campanhas"
           description="Gerencie suas campanhas de distribuição de leads"
         />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-64 bg-muted/20 animate-pulse rounded-lg" />
-          ))}
-        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <p className="text-lg text-muted-foreground text-center">
+              {availableTeams.length === 0 
+                ? "Você ainda não faz parte de nenhuma operação. Crie uma operação em Configurações → Gerenciar Operações."
+                : "Selecione uma operação para ver as campanhas."}
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }

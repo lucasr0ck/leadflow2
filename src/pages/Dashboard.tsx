@@ -21,7 +21,7 @@ interface ChartData {
 
 export const Dashboard = () => {
   const { user } = useAuth();
-  const { currentTeam } = useTeam();
+  const { currentTeam, loading: teamLoading, availableTeams } = useTeam();
   const [stats, setStats] = useState<DashboardStats>({
     activeSellers: 0,
     activeCampaigns: 0,
@@ -100,6 +100,27 @@ export const Dashboard = () => {
       console.error('Error fetching dashboard data:', error);
     }
   };
+
+  // Se não tem team e não está carregando, mostrar mensagem
+  if (!teamLoading && !currentTeam) {
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          title="Dashboard"
+          description="Overview of your lead distribution performance"
+        />
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <p className="text-lg text-muted-foreground text-center mb-4">
+              {availableTeams.length === 0 
+                ? "Você ainda não faz parte de nenhuma operação. Crie uma operação em Configurações → Gerenciar Operações."
+                : "Selecione uma operação para ver o dashboard."}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
