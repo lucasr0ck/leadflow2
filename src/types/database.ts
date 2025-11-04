@@ -3,7 +3,37 @@ export interface Team {
   id: string;
   team_name: string;
   owner_id: string;
+  slug: string;
+  description?: string;
+  is_active: boolean;
   created_at: string;
+}
+
+export type TeamRole = 'owner' | 'admin' | 'member';
+
+export interface TeamMember {
+  id: string;
+  team_id: string;
+  user_id: string;
+  role: TeamRole;
+  joined_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TeamMemberWithUser extends TeamMember {
+  user_email?: string;
+}
+
+export interface UserTeam {
+  team_id: string;
+  team_name: string;
+  team_slug: string;
+  description: string | null;
+  role: TeamRole;
+  is_active: boolean;
+  member_count: number;
+  joined_at: string;
 }
 
 export interface Seller {
@@ -27,6 +57,7 @@ export interface Campaign {
   team_id: string;
   name: string;
   slug: string;
+  full_slug: string;
   is_active: boolean;
   greeting_message?: string;
   created_at: string;
