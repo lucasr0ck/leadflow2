@@ -53,17 +53,22 @@ export const AppSidebar = () => {
           
           {/* Seletor de Operação */}
           {!teamLoading && availableTeams.length > 0 && (
-            <div className="space-y-1">
+            <div className="space-y-1" key={currentTeam?.team_id || 'no-team'}>
               <span className="text-xs text-slate-500 font-medium">Operação Ativa</span>
               <Select
                 value={currentTeam?.team_id || ''}
-                onValueChange={switchTeam}
+                onValueChange={(value) => {
+                  console.log('Switching to team:', value);
+                  switchTeam(value);
+                }}
                 disabled={availableTeams.length === 1}
               >
                 <SelectTrigger className="h-9 w-full">
                   <div className="flex items-center gap-2 flex-1 overflow-hidden">
                     <Building2 className="w-4 h-4 shrink-0 text-slate-600" />
-                    <SelectValue placeholder="Selecione uma operação" />
+                    <SelectValue placeholder="Selecione uma operação">
+                      {currentTeam?.team_name || 'Selecione uma operação'}
+                    </SelectValue>
                   </div>
                 </SelectTrigger>
                 <SelectContent>
@@ -125,16 +130,17 @@ export const AppSidebar = () => {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Button
-                onClick={signOut}
-                variant="ghost"
-                className="w-full justify-start"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Sair</span>
-              </Button>
-            </SidebarMenuButton>
+            <Button
+              onClick={async () => {
+                console.log('Logout clicked');
+                await signOut();
+              }}
+              variant="ghost"
+              className="w-full justify-start"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sair</span>
+            </Button>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
