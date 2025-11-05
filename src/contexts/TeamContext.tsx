@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { UserTeam } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
@@ -24,9 +24,17 @@ export function TeamProvider({ children }: TeamProviderProps) {
   const [availableTeams, setAvailableTeams] = useState<UserTeam[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const isLoadingRef = useRef(false);
 
   // Carregar teams do usuário
-  const loadUserTeams = async () => {
+  const loadUserTeams = useCallback(async () => {
+    // Prevenir chamadas simultâneas
+    if (isLoadingRef.current) {
+      console.log('TeamContext: Já está carregando, ignorando chamada duplicada');
+      return;
+    }
+
+    isLoadingRef.current = true;
     try {
       setLoading(true);
       
@@ -91,8 +99,10 @@ export function TeamProvider({ children }: TeamProviderProps) {
     } catch (err) {
       console.error('Erro inesperado ao carregar teams:', err);
       setLoading(false);
+    } finally {
+      isLoadingRef.current = false;
     }
-  };
+  }, [toast]);
 
   // Trocar de operação
   const switchTeam = (teamId: string) => {
@@ -120,27 +130,32 @@ export function TeamProvider({ children }: TeamProviderProps) {
     await loadUserTeams();
   };
 
-  // Carregar teams quando o componente montar
+  // Carregar teams quando o componente montar e quando auth mudar
   useEffect(() => {
+    console.log('TeamContext: Inicializando...');
+    
+    // Carregar teams inicialmente
     loadUserTeams();
-  }, []);
 
-  // Recarregar quando o usuário mudar (login/logout)
-  useEffect(() => {
+    // Listener para mudanças de auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      console.log('TeamContext: Auth mudou ->', event);
+      
       if (event === 'SIGNED_IN') {
         loadUserTeams();
       } else if (event === 'SIGNED_OUT') {
         setCurrentTeam(null);
         setAvailableTeams([]);
+        setLoading(false);
         localStorage.removeItem(CURRENT_TEAM_KEY);
       }
     });
 
     return () => {
+      console.log('TeamContext: Limpando subscription');
       subscription.unsubscribe();
     };
-  }, []);
+  }, [loadUserTeams]);
 
   const value: TeamContextType = {
     currentTeam,
