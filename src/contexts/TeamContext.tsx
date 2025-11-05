@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { UserTeam } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
@@ -121,9 +121,10 @@ export function TeamProvider({ children }: TeamProviderProps) {
     };
 
     loadTeams();
-  }, [user, authLoading, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading]);
 
-  const switchTeam = (teamId: string) => {
+  const switchTeam = useCallback((teamId: string) => {
     console.log('[TeamContext] Switching to:', teamId);
     
     const team = availableTeams.find(t => t.team_id === teamId);
@@ -144,9 +145,9 @@ export function TeamProvider({ children }: TeamProviderProps) {
       title: "Operação alterada",
       description: `Você está agora em: ${team.team_name}`,
     });
-  };
+  }, [availableTeams, toast]);
 
-  const refreshTeams = async () => {
+  const refreshTeams = useCallback(async () => {
     console.log('[TeamContext] Refreshing teams');
     
     if (!user) {
@@ -207,7 +208,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
         variant: "destructive",
       });
     }
-  };
+  }, [user, currentTeam, toast]);
 
   useEffect(() => {
     console.log('[TeamContext] Setting up auth listener');
@@ -236,7 +237,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
     loading,
     switchTeam,
     refreshTeams,
-  }), [currentTeam, availableTeams, loading]);
+  }), [currentTeam, availableTeams, loading, switchTeam, refreshTeams]);
 
   return <TeamContext.Provider value={value}>{children}</TeamContext.Provider>;
 }
