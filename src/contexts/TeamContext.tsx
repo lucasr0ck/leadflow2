@@ -19,6 +19,23 @@ interface TeamProviderProps {
   children: ReactNode;
 }
 
+const normalizeMemberCount = (value: unknown): number => {
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  if (typeof value === 'bigint') {
+    return Number(value);
+  }
+
+  return 0;
+};
+
 export function TeamProvider({ children }: TeamProviderProps) {
   const [currentTeam, setCurrentTeam] = useState<UserTeam | null>(null);
   const [availableTeams, setAvailableTeams] = useState<UserTeam[]>([]);
@@ -57,12 +74,13 @@ export function TeamProvider({ children }: TeamProviderProps) {
 
       // Chamar função do Supabase que retorna os teams do usuário
       console.log('🔵 [TeamContext] Chamando get_user_teams()...');
-      const { data, error } = await supabase.rpc('get_user_teams');
+      const { data, error } = await supabase.rpc('get_user_teams', {
+        user_id_param: user.id,
+      });
       console.log('🔵 [TeamContext] Resposta get_user_teams:', { data, error });
 
       if (error) {
         console.error('❌ [TeamContext] ERRO ao carregar teams:', error);
-        
         // Se a função não existe, significa que as migrations não foram executadas
         if (error.message?.includes('function') || error.message?.includes('does not exist')) {
           console.error('❌ [TeamContext] Função get_user_teams() NÃO EXISTE - Migrations não executadas!');
@@ -85,7 +103,11 @@ export function TeamProvider({ children }: TeamProviderProps) {
         return;
       }
 
-      const teams = (data || []) as UserTeam[];
+      const teams = ((data || []) as UserTeam[]).map(team => ({
+        ...team,
+        member_count: normalizeMemberCount(team.member_count),
+      }));
+
       console.log('✅ [TeamContext] Teams recebidos:', teams.length, 'teams');
       console.log('✅ [TeamContext] Detalhes teams:', teams);
       setAvailableTeams(teams);
