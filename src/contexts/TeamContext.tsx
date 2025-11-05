@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { UserTeam } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
@@ -43,6 +43,12 @@ export function TeamProvider({ children }: TeamProviderProps) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
+  
+  // Use ref to avoid toast being in dependencies
+  const toastRef = useRef(toast);
+  useEffect(() => {
+    toastRef.current = toast;
+  }, [toast]);
 
   useEffect(() => {
     console.log('[TeamContext] Effect - authLoading:', authLoading, 'user:', user?.email || 'none');
@@ -71,7 +77,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
 
         if (error) {
           console.error('[TeamContext] Error:', error);
-          toast({
+          toastRef.current({
             title: "Erro ao carregar operações",
             description: error.message,
             variant: "destructive",
@@ -112,7 +118,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
         setAvailableTeams([]);
         setCurrentTeam(null);
         setLoading(false);
-        toast({
+        toastRef.current({
           title: "Erro ao carregar operações",
           description: err instanceof Error ? err.message : "Erro desconhecido",
           variant: "destructive",
@@ -121,7 +127,6 @@ export function TeamProvider({ children }: TeamProviderProps) {
     };
 
     loadTeams();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading]);
 
   const switchTeam = useCallback((teamId: string) => {
@@ -131,7 +136,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
     
     if (!team) {
       console.error('[TeamContext] Team not found:', teamId);
-      toast({
+      toastRef.current({
         title: "Operação não encontrada",
         variant: "destructive",
       });
@@ -141,11 +146,11 @@ export function TeamProvider({ children }: TeamProviderProps) {
     setCurrentTeam(team);
     localStorage.setItem(CURRENT_TEAM_KEY, teamId);
     
-    toast({
+    toastRef.current({
       title: "Operação alterada",
       description: `Você está agora em: ${team.team_name}`,
     });
-  }, [availableTeams, toast]);
+  }, [availableTeams]);
 
   const refreshTeams = useCallback(async () => {
     console.log('[TeamContext] Refreshing teams');
@@ -164,7 +169,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
 
       if (error) {
         console.error('[TeamContext] Refresh error:', error);
-        toast({
+        toastRef.current({
           title: "Erro ao atualizar operações",
           description: error.message,
           variant: "destructive",
@@ -202,13 +207,13 @@ export function TeamProvider({ children }: TeamProviderProps) {
     } catch (err) {
       console.error('[TeamContext] Unexpected refresh error:', err);
       setLoading(false);
-      toast({
+      toastRef.current({
         title: "Erro ao atualizar operações",
         description: err instanceof Error ? err.message : "Erro desconhecido",
         variant: "destructive",
       });
     }
-  }, [user, currentTeam, toast]);
+  }, [user, currentTeam]);
 
   useEffect(() => {
     console.log('[TeamContext] Setting up auth listener');
