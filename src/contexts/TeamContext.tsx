@@ -47,6 +47,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const isLoadingRef = useRef(false);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Carregar teams do usuário
   const loadUserTeams = useCallback(async () => {
@@ -63,6 +64,24 @@ export function TeamProvider({ children }: TeamProviderProps) {
 
     isLoadingRef.current = true;
     console.log('🔵 [TeamContext] isLoadingRef = true, setLoading(true)');
+    
+    // ✅ CRITICAL: Timeout de segurança - se passar de 15 segundos, forçar reset
+    loadTimeoutRef.current = setTimeout(() => {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.error(`❌ [TeamContext] TIMEOUT DE SEGURANÇA: loadUserTeams travou por ${elapsed}s - Forçando reset`);
+      setAvailableTeams([]);
+      setCurrentTeam(null);
+      setTeamsLoaded(false);
+      setIsContextReady(false);
+      setLoading(false);
+      isLoadingRef.current = false;
+      toast({
+        title: "Erro ao carregar operações",
+        description: "O carregamento demorou muito. Tente recarregar a página.",
+        variant: "destructive",
+      });
+      console.groupEnd();
+    }, 15000);
     
     try {
       setLoading(true);
@@ -85,11 +104,38 @@ export function TeamProvider({ children }: TeamProviderProps) {
       }
 
       // Chamar função do Supabase que retorna os teams do usuário
+      // ✅ CRITICAL FIX: Adicionar timeout para evitar travamento infinito
       console.log(`🔵 [TeamContext] Chamando get_user_teams() com user_id: ${user.id}...`);
       const rpcStartTime = Date.now();
-      const { data, error } = await supabase.rpc('get_user_teams', {
+      
+      // Criar promise com timeout de 10 segundos
+      const rpcPromise = supabase.rpc('get_user_teams', {
         user_id_param: user.id,
       });
+      
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('TIMEOUT: get_user_teams() demorou mais de 10 segundos'));
+        }, 10000);
+      });
+      
+      let data, error;
+      try {
+        const result = await Promise.race([rpcPromise, timeoutPromise]);
+        data = result.data;
+        error = result.error;
+      } catch (timeoutError: any) {
+        const rpcElapsed = ((Date.now() - rpcStartTime) / 1000).toFixed(2);
+        console.error(`❌ [TeamContext] TIMEOUT na chamada RPC (${rpcElapsed}s):`, timeoutError);
+        error = {
+          message: timeoutError.message || 'Timeout ao carregar teams',
+          details: 'A chamada get_user_teams() demorou mais de 10 segundos',
+          hint: 'Verifique a conexão com o Supabase ou se a função está lenta',
+          code: 'TIMEOUT',
+        };
+        data = null;
+      }
+      
       const rpcElapsed = ((Date.now() - rpcStartTime) / 1000).toFixed(2);
       console.log(`🔵 [TeamContext] Resposta get_user_teams (${rpcElapsed}s):`, {
         dataLength: data?.length || 0,
@@ -153,6 +199,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
         setTeamsLoaded(true); // Teams foram carregados (mesmo que vazio)
         setIsContextReady(false); // Mas não está pronto pois não tem team selecionado
         setLoading(false);
+        console.groupEnd();
         return;
       }
 
@@ -194,13 +241,32 @@ export function TeamProvider({ children }: TeamProviderProps) {
       const totalElapsed = ((Date.now() - startTime) / 1000).toFixed(2);
       console.error(`❌ [TeamContext] ERRO INESPERADO ao carregar teams (${totalElapsed}s):`, err);
       console.error('📍 Stack trace:', err instanceof Error ? err.stack : 'N/A');
+      
+      // ✅ CRITICAL: Sempre resetar estado mesmo em erro
+      setAvailableTeams([]);
+      setCurrentTeam(null);
       setTeamsLoaded(false);
       setIsContextReady(false);
       setLoading(false);
+      
+      // Mostrar toast de erro
+      toast({
+        title: "Erro ao carregar operações",
+        description: err instanceof Error ? err.message : "Erro desconhecido ao carregar teams",
+        variant: "destructive",
+      });
+      
       console.groupEnd();
     } finally {
+      // ✅ CRITICAL: SEMPRE resetar isLoadingRef, mesmo se houver erro ou timeout
       console.log('🔵 [TeamContext] isLoadingRef = false (finally)');
       isLoadingRef.current = false;
+      
+      // Limpar timeout de segurança
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
     }
   }, [toast]);
 
@@ -242,7 +308,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
   // ✅ CRITICAL FIX: Carregar teams apenas UMA VEZ quando autenticado
   // Este effect só roda quando authState muda ou quando teams ainda não foram carregados
   useEffect(() => {
-    console.log('🟢 [TeamContext] useEffect PRINCIPAL - authLoading:', authLoading, 'user:', user?.email || 'null', 'teamsLoaded:', teamsLoaded);
+    console.log('🟢 [TeamContext] useEffect PRINCIPAL - authLoading:', authLoading, 'user:', user?.email || 'null', 'teamsLoaded:', teamsLoaded, 'isLoadingRef:', isLoadingRef.current);
     
     // Se auth ainda está carregando, aguardar
     if (authLoading) {
@@ -259,12 +325,14 @@ export function TeamProvider({ children }: TeamProviderProps) {
       setTeamsLoaded(false);
       setIsContextReady(false);
       setLoading(false);
+      // ✅ CRITICAL: Resetar isLoadingRef se não tem usuário
+      isLoadingRef.current = false;
       return;
     }
 
     // ✅ MÁGICA: Só carregar teams se ainda não foram carregados
     // Isso previne refetch desnecessário em cada navegação
-    if (user && !teamsLoaded) {
+    if (user && !teamsLoaded && !isLoadingRef.current) {
       console.log('🟢 [TeamContext] Auth pronto, usuário autenticado, teams NÃO carregados ainda - carregando teams...');
       loadUserTeams();
     } else if (user && teamsLoaded) {
@@ -281,6 +349,9 @@ export function TeamProvider({ children }: TeamProviderProps) {
         console.log('🟢 [TeamContext] Teams carregados mas vazios - usuário precisa criar um');
         setIsContextReady(false);
       }
+    } else if (user && !teamsLoaded && isLoadingRef.current) {
+      // ⚠️ ALERTA: Teams não carregados mas isLoadingRef está true - possível travamento
+      console.warn('⚠️ [TeamContext] POSSÍVEL TRAVAMENTO: teams não carregados mas isLoadingRef=true. Aguardando...');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading, teamsLoaded]); // teamsLoaded na deps previne refetch
