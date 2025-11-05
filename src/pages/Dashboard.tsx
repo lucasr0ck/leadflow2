@@ -31,10 +31,25 @@ export const Dashboard = () => {
   const [recentCampaigns, setRecentCampaigns] = useState<any[]>([]);
 
   useEffect(() => {
-    console.log('[Dashboard] useEffect triggered:', { hasUser: !!user, hasTeam: !!currentTeam, teamLoading });
-    if (user && currentTeam && !teamLoading) {
+    console.log('[Dashboard] useEffect triggered:', { 
+      hasUser: !!user, 
+      hasTeam: !!currentTeam, 
+      teamLoading,
+      teamId: currentTeam?.team_id,
+      teamName: currentTeam?.team_name 
+    });
+    
+    // ⚠️ CRITICAL FIX: Não renderizar se ainda está carregando teams
+    if (teamLoading) {
+      console.log('[Dashboard] Aguardando teams carregarem...');
+      return;
+    }
+    
+    if (user && currentTeam) {
       console.log('[Dashboard] Fetching dashboard data for team:', currentTeam.team_name);
       fetchDashboardData();
+    } else {
+      console.log('[Dashboard] Não vai buscar dados:', { hasUser: !!user, hasTeam: !!currentTeam });
     }
   }, [user, currentTeam?.team_id, teamLoading]); // Dependência específica no team_id
 
@@ -103,8 +118,27 @@ export const Dashboard = () => {
     }
   };
 
+  // ⚠️ CRITICAL FIX: Mostrar loading enquanto teams estão carregando
+  if (teamLoading) {
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          title="Dashboard"
+          description="Overview of your lead distribution performance"
+        />
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <p className="text-lg text-muted-foreground text-center">
+              Carregando operação...
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // Se não tem team e não está carregando, mostrar mensagem
-  if (!teamLoading && !currentTeam) {
+  if (!currentTeam) {
     return (
       <div className="space-y-8">
         <PageHeader

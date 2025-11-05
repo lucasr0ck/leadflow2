@@ -57,10 +57,16 @@ export const useAnalytics = (dateRange: DateRange) => {
       teamId: currentTeam?.team_id 
     });
     
-    if (user && currentTeam && !teamLoading) {
+    // ⚠️ CRITICAL FIX: Aguardar teams carregarem
+    if (teamLoading) {
+      console.log('[useAnalytics] Aguardando teams carregarem...');
+      return;
+    }
+    
+    if (user && currentTeam) {
       console.log('[useAnalytics] Fetching analytics for team:', currentTeam.team_name);
       fetchAnalytics();
-    } else if (!teamLoading && !currentTeam) {
+    } else if (!currentTeam) {
       console.warn('[useAnalytics] No team selected');
       setError('Selecione uma operação para ver os analytics');
       setLoading(false);

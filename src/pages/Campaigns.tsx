@@ -41,10 +41,16 @@ export const Campaigns = () => {
       teamId: currentTeam?.team_id 
     });
     
-    if (user && currentTeam && !teamLoading) {
+    // ⚠️ CRITICAL FIX: Aguardar teams carregarem
+    if (teamLoading) {
+      console.log('[Campaigns] Aguardando teams carregarem...');
+      return;
+    }
+    
+    if (user && currentTeam) {
       console.log('[Campaigns] Fetching campaigns for team:', currentTeam.team_name);
       fetchCampaigns();
-    } else if (!teamLoading) {
+    } else {
       console.log('[Campaigns] Stopping loading - no team or user');
       setLoading(false);
     }

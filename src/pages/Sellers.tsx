@@ -47,10 +47,21 @@ export const Sellers = () => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
+    console.log('[Sellers] useEffect triggered:', { 
+      hasUser: !!user, 
+      hasTeam: !!currentTeam, 
+      teamId: currentTeam?.team_id 
+    });
+    
+    // ⚠️ CRITICAL FIX: Verificar se team está disponível
     if (user && currentTeam) {
+      console.log('[Sellers] Fetching sellers for team:', currentTeam.team_name);
       fetchSellers();
+    } else {
+      console.log('[Sellers] No team or user - stopping loading');
+      setLoading(false);
     }
-  }, [user, currentTeam]);
+  }, [user, currentTeam?.team_id]);
 
   const fetchSellers = async () => {
     if (!currentTeam) {
