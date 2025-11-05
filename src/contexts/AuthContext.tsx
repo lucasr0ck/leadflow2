@@ -22,77 +22,86 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     console.log('🟡🟡🟡 [AuthProvider] USEEFFECT INICIOU - Initializing authentication...');
-    console.log('🟡 [AuthProvider] Window location:', window.location.href);
-    console.log('🟡 [AuthProvider] localStorage keys:', Object.keys(localStorage));
     
-    try {
-      // Set up auth state listener FIRST
-      console.log('🟡 [AuthProvider] Configurando onAuthStateChange listener...');
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          console.log('🟡🟡🟡 [AuthProvider] AUTH STATE CHANGE:', event);
-          console.log('🟡 [AuthProvider] Session:', session?.user?.email || 'NO SESSION');
-          console.log('🟡 [AuthProvider] User ID:', session?.user?.id || 'NO USER');
-          
-          setSession(session);
-          setUser(session?.user ?? null);
-          setLoading(false);
-          
-          console.log('🟡 [AuthProvider] State atualizado:', { 
-            hasSession: !!session, 
-            hasUser: !!session?.user,
-            loading: false 
-          });
-
-          // Log authentication events
-          if (event === 'SIGNED_IN' && session?.user) {
-            await logAudit({
-              action_type: 'login',
-              metadata: {
-                email: session.user.email,
-                event: event,
-              }
-            });
-          } else if (event === 'SIGNED_OUT') {
-            await logAudit({
-              action_type: 'logout',
-              metadata: {
-                event: event,
-              }
-            });
-          }
-        }
-      );
-
-      // THEN check for existing session
-      console.log('🟡 [AuthProvider] Verificando sessão existente com getSession()...');
-      supabase.auth.getSession().then(({ data: { session }, error }) => {
-        if (error) {
-          console.error('🟡❌ [AuthProvider] ERRO ao buscar sessão:', error);
-        }
-        console.log('🟡 [AuthProvider] Sessão inicial:', session?.user?.email || 'NO SESSION');
-        console.log('🟡 [AuthProvider] Access token:', session?.access_token ? 'EXISTS' : 'NO TOKEN');
-        console.log('🟡 [AuthProvider] Expires at:', session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'N/A');
-        
+    let isInitialized = false; // Prevenir múltiplas inicializações
+    
+    // 1. PRIMEIRO: Buscar sessão existente (síncrono, imediato)
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('🟡❌ [AuthProvider] ERRO ao buscar sessão:', error);
+      }
+      
+      console.log('🟡 [AuthProvider] Sessão inicial:', session?.user?.email || 'NO SESSION');
+      
+      // Definir estado inicial APENAS se ainda não foi inicializado
+      if (!isInitialized) {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        isInitialized = true;
         
         console.log('🟡✅ [AuthProvider] Estado inicial configurado:', {
           hasSession: !!session,
           hasUser: !!session?.user,
+          email: session?.user?.email,
           loading: false
         });
-      }).catch((error) => {
-        console.error('🟡❌ [AuthProvider] FALHA CRÍTICA ao buscar sessão:', error);
+      }
+    }).catch((error) => {
+      console.error('🟡❌ [AuthProvider] FALHA ao buscar sessão:', error);
+      if (!isInitialized) {
         setLoading(false);
-      });
+        isInitialized = true;
+      }
+    });
 
-      return () => subscription.unsubscribe();
-    } catch (error) {
-      console.error('AuthProvider initialization error:', error);
-      setLoading(false);
-    }
+    // 2. DEPOIS: Configurar listener para mudanças futuras
+    console.log('🟡 [AuthProvider] Configurando onAuthStateChange listener...');
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('🟡🟡🟡 [AuthProvider] AUTH STATE CHANGE:', event);
+        console.log('🟡 [AuthProvider] Session:', session?.user?.email || 'NO SESSION');
+        
+        // Atualizar estado em mudanças futuras
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Garantir que loading seja false após qualquer mudança de auth
+        if (!isInitialized) {
+          setLoading(false);
+          isInitialized = true;
+        }
+        
+        console.log('🟡 [AuthProvider] State atualizado:', { 
+          event,
+          hasSession: !!session, 
+          hasUser: !!session?.user,
+        });
+
+        // Log authentication events
+        if (event === 'SIGNED_IN' && session?.user) {
+          await logAudit({
+            action_type: 'login',
+            metadata: {
+              email: session.user.email,
+              event: event,
+            }
+          });
+        } else if (event === 'SIGNED_OUT') {
+          await logAudit({
+            action_type: 'logout',
+            metadata: {
+              event: event,
+            }
+          });
+        }
+      }
+    );
+
+    return () => {
+      console.log('🟡 [AuthProvider] Limpando subscription...');
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
