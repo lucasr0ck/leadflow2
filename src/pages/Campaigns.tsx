@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTeam } from '@/contexts/TeamContext';
+import { useToast } from '@/hooks/use-toast';
 import { CampaignCard } from '@/components/campaigns/CampaignCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -28,28 +29,40 @@ interface Campaign {
 export const Campaigns = () => {
   const { user } = useAuth();
   const { currentTeam, loading: teamLoading, availableTeams } = useTeam();
+  const { toast } = useToast();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user && currentTeam) {
+    console.log('[Campaigns] useEffect triggered:', { 
+      hasUser: !!user, 
+      hasTeam: !!currentTeam, 
+      teamLoading,
+      teamId: currentTeam?.team_id 
+    });
+    
+    if (user && currentTeam && !teamLoading) {
+      console.log('[Campaigns] Fetching campaigns for team:', currentTeam.team_name);
       fetchCampaigns();
     } else if (!teamLoading) {
+      console.log('[Campaigns] Stopping loading - no team or user');
       setLoading(false);
     }
-  }, [user, currentTeam, teamLoading]);
+  }, [user, currentTeam?.team_id, teamLoading]); // Dependência específica no team_id, não no objeto inteiro
 
   const fetchCampaigns = async () => {
     if (!currentTeam) {
+      console.log('[Campaigns] fetchCampaigns: No currentTeam, aborting');
       setLoading(false);
       return;
     }
 
     try {
+      console.log('[Campaigns] fetchCampaigns: Starting fetch for team:', currentTeam.team_id);
       setLoading(true);
 
       // Fetch campaigns with basic data - seller distribution is now dynamic
-      const { data: campaignsData } = await supabase
+      const { data: campaignsData, error: campaignsError } = await supabase
         .from('campaigns')
         .select(`
           id,
@@ -62,7 +75,17 @@ export const Campaigns = () => {
         .eq('team_id', currentTeam.team_id)
         .order('created_at', { ascending: false });
 
-      if (!campaignsData) return;
+      if (campaignsError) {
+        console.error('[Campaigns] Error fetching campaigns:', campaignsError);
+        throw campaignsError;
+      }
+
+      if (!campaignsData) {
+        console.log('[Campaigns] No campaigns data returned');
+        return;
+      }
+
+      console.log('[Campaigns] Fetched', campaignsData.length, 'campaigns');
 
       // Fetch click data for each campaign
       const campaignsWithMetrics = await Promise.all(
@@ -105,10 +128,17 @@ export const Campaigns = () => {
         })
       );
 
+      console.log('[Campaigns] Setting campaigns state with', campaignsWithMetrics.length, 'items');
       setCampaigns(campaignsWithMetrics);
     } catch (error) {
-      console.error('Error fetching campaigns:', error);
+      console.error('[Campaigns] ERROR fetching campaigns:', error);
+      toast({
+        title: "Erro ao carregar campanhas",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive",
+      });
     } finally {
+      console.log('[Campaigns] fetchCampaigns complete');
       setLoading(false);
     }
   };

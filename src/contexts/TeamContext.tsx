@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { UserTeam } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
@@ -25,6 +25,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const isLoadingRef = useRef(false);
+  const hasInitializedRef = useRef(false);
 
   // Carregar teams do usuário
   const loadUserTeams = useCallback(async () => {
@@ -132,6 +133,13 @@ export function TeamProvider({ children }: TeamProviderProps) {
 
   // Carregar teams quando o componente montar e quando auth mudar
   useEffect(() => {
+    // Prevenir múltiplas inicializações
+    if (hasInitializedRef.current) {
+      console.log('TeamContext: Já inicializado, ignorando');
+      return;
+    }
+    
+    hasInitializedRef.current = true;
     console.log('TeamContext: Inicializando...');
     
     // Carregar teams inicialmente
@@ -143,8 +151,9 @@ export function TeamProvider({ children }: TeamProviderProps) {
       
       if (event === 'SIGNED_IN') {
         // Pequeno delay para garantir que o user está disponível
-        setTimeout(() => loadUserTeams(), 100);
+        setTimeout(() => loadUserTeams(), 150);
       } else if (event === 'SIGNED_OUT') {
+        isLoadingRef.current = false;
         setCurrentTeam(null);
         setAvailableTeams([]);
         setLoading(false);
@@ -155,16 +164,18 @@ export function TeamProvider({ children }: TeamProviderProps) {
     return () => {
       console.log('TeamContext: Limpando subscription');
       subscription.unsubscribe();
+      hasInitializedRef.current = false;
     };
   }, []); // Array vazio - só executa uma vez
 
-  const value: TeamContextType = {
+  // Memoizar o value para evitar re-renders desnecessários
+  const value = useMemo<TeamContextType>(() => ({
     currentTeam,
     availableTeams,
     loading,
     switchTeam,
     refreshTeams,
-  };
+  }), [currentTeam, availableTeams, loading, switchTeam, refreshTeams]);
 
   return <TeamContext.Provider value={value}>{children}</TeamContext.Provider>;
 }

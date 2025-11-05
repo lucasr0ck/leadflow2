@@ -31,10 +31,12 @@ export const Dashboard = () => {
   const [recentCampaigns, setRecentCampaigns] = useState<any[]>([]);
 
   useEffect(() => {
-    if (user && currentTeam) {
+    console.log('[Dashboard] useEffect triggered:', { hasUser: !!user, hasTeam: !!currentTeam, teamLoading });
+    if (user && currentTeam && !teamLoading) {
+      console.log('[Dashboard] Fetching dashboard data for team:', currentTeam.team_name);
       fetchDashboardData();
     }
-  }, [user, currentTeam]);
+  }, [user, currentTeam?.team_id, teamLoading]); // Dependência específica no team_id
 
   const fetchDashboardData = async () => {
     if (!currentTeam) return;
