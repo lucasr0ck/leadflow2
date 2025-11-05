@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuditLog } from '@/hooks/useAuditLog';
@@ -114,38 +114,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     console.log('🔴🔴🔴 [AuthContext] signOut CALLED - INÍCIO');
+    
+    // Prevent multiple simultaneous calls
+    if (loading) {
+      console.log('🔴⚠️ [AuthContext] signOut já em andamento, ignorando chamada duplicada');
+      return;
+    }
+    
     try {
+      setLoading(true);
       console.log('🔴 [AuthContext] Chamando supabase.auth.signOut()...');
+      
+      // Limpar localStorage ANTES de fazer signOut para evitar race conditions
+      localStorage.removeItem('leadflow_current_team_id');
+      console.log('🔴✅ [AuthContext] localStorage limpo');
+      
       const { error } = await supabase.auth.signOut();
       
       if (error) {
         console.error('🔴❌ [AuthContext] ERRO ao fazer signOut:', error);
-        throw error;
+        // Continuar mesmo com erro
+      } else {
+        console.log('🔴✅ [AuthContext] supabase.auth.signOut() executado com sucesso');
       }
       
-      console.log('🔴✅ [AuthContext] supabase.auth.signOut() executado com sucesso');
-      console.log('🔴 [AuthContext] Limpando localStorage...');
-      
-      // Limpar localStorage explicitamente
-      localStorage.removeItem('leadflow_current_team_id');
-      
-      console.log('🔴✅ [AuthContext] localStorage limpo');
+      // Sempre redirecionar, mesmo se houver erro
       console.log('🔴 [AuthContext] Redirecionando para /login...');
-      
-      // Redirecionar FORÇADO para login
       window.location.href = '/login';
       
       console.log('🔴✅ [AuthContext] signOut COMPLETO');
     } catch (error) {
       console.error('🔴❌ [AuthContext] ERRO CRÍTICO em signOut:', error);
       
-      // Mesmo com erro, forçar logout
+      // Mesmo com erro, forçar logout e redirecionar
       localStorage.clear();
       window.location.href = '/login';
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [loading]);
 
   return (
     <AuthContext.Provider value={{ user, session, loading, signIn, signOut }}>

@@ -93,6 +93,31 @@ export const Campaigns = () => {
 
       console.log('[Campaigns] Fetched', campaignsData.length, 'campaigns');
 
+      // ✅ CRITICAL FIX: Fetch sellers ONCE for all campaigns (not per campaign)
+      // This prevents multiple identical queries and potential RLS issues
+      if (!currentTeam?.team_id) {
+        console.error('[Campaigns] No team_id available, cannot fetch sellers');
+        throw new Error('Team ID is required');
+      }
+
+      const { data: sellersData, error: sellersError } = await supabase
+        .from('sellers')
+        .select('name, weight')
+        .eq('team_id', currentTeam.team_id)
+        .eq('is_active', true);
+
+      if (sellersError) {
+        console.error('[Campaigns] Error fetching sellers:', sellersError);
+        // Don't throw - continue with empty sellers array
+      }
+
+      const sellers = sellersData?.map(seller => ({
+        name: seller.name,
+        positions: seller.weight, // Weight represents their share in the distribution
+      })) || [];
+
+      console.log('[Campaigns] Fetched', sellers.length, 'active sellers for team');
+
       // Fetch click data for each campaign
       const campaignsWithMetrics = await Promise.all(
         campaignsData.map(async (campaign) => {
@@ -110,20 +135,7 @@ export const Campaigns = () => {
             .eq('campaign_id', campaign.id)
             .gte('created_at', sevenDaysAgo.toISOString());
 
-          // Get sellers for this team with their weights (dynamic distribution)
-          // Note: In the new architecture, ALL active sellers from the team participate in ALL campaigns
-          // The distribution is based on weight, not pre-assigned links
-          const { data: sellersData } = await supabase
-            .from('sellers')
-            .select('name, weight')
-            .eq('team_id', currentTeam.team_id)
-            .eq('is_active', true);
-
-          const sellers = sellersData?.map(seller => ({
-            name: seller.name,
-            positions: seller.weight, // Weight represents their share in the distribution
-          })) || [];
-
+          // Use the sellers fetched once above (shared across all campaigns)
           return {
             id: campaign.id,
             name: campaign.name,
@@ -132,7 +144,7 @@ export const Campaigns = () => {
             is_active: campaign.is_active,
             totalClicks: totalClicksData?.length || 0,
             clicksLast7Days: recentClicksData?.length || 0,
-            sellers,
+            sellers, // Same sellers array for all campaigns
           };
         })
       );
