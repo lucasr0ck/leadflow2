@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { supabase } from '@/integrations/supabase/client';
 import { UserTeam } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface TeamContextType {
   currentTeam: UserTeam | null;
@@ -41,8 +42,8 @@ export function TeamProvider({ children }: TeamProviderProps) {
   const [availableTeams, setAvailableTeams] = useState<UserTeam[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
   const isLoadingRef = useRef(false);
-  const recoveryAttemptedRef = useRef(false);
 
   // Carregar teams do usuário
   const loadUserTeams = useCallback(async () => {
@@ -125,16 +126,20 @@ export function TeamProvider({ children }: TeamProviderProps) {
       console.log('🔵 [TeamContext] Team salvo no localStorage:', savedTeamId);
       const savedTeam = teams.find(t => t.team_id === savedTeamId);
 
+      let teamToSelect: UserTeam;
       if (savedTeam) {
         console.log('✅ [TeamContext] Restaurando team salvo:', savedTeam.team_name);
-        setCurrentTeam(savedTeam);
+        teamToSelect = savedTeam;
       } else {
         console.log('🔵 [TeamContext] Nenhum team salvo, selecionando primeiro:', teams[0].team_name);
         // Se não tem team salvo, selecionar o primeiro
-        setCurrentTeam(teams[0]);
+        teamToSelect = teams[0];
         localStorage.setItem(CURRENT_TEAM_KEY, teams[0].team_id);
       }
 
+      // IMPORTANTE: Setar currentTeam ANTES de setLoading(false) para evitar race conditions
+      setCurrentTeam(teamToSelect);
+      console.log('✅ [TeamContext] currentTeam setado:', teamToSelect.team_name);
       console.log('✅ [TeamContext] setLoading(false) - Carregamento completo');
       setLoading(false);
     } catch (err) {
@@ -178,56 +183,40 @@ export function TeamProvider({ children }: TeamProviderProps) {
     await loadUserTeams();
   };
 
-  // Carregar teams quando o componente montar e quando auth mudar
+  // Carregar teams quando auth mudar - DEPENDÊNCIA DIRETA NO user E authLoading
   useEffect(() => {
-    console.log('🟢 [TeamContext] useEffect PRINCIPAL MONTADO/RE-MONTADO');
-    let isMounted = true;
-    let timeoutId: ReturnType<typeof setTimeout>;
+    console.log('🟢 [TeamContext] useEffect PRINCIPAL - authLoading:', authLoading, 'user:', user?.email || 'null');
+    
+    // Se auth ainda está carregando, aguardar
+    if (authLoading) {
+      console.log('🟢 [TeamContext] Auth ainda carregando, aguardando...');
+      return;
+    }
 
-    const initializeTeams = async () => {
-      console.log('🟢 [TeamContext] initializeTeams INICIOU');
-      
-      // ⚠️ CRITICAL FIX: Aguardar auth estar pronto antes de buscar teams
-      console.log('🟢 [TeamContext] Aguardando 100ms para auth estar pronto...');
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log('🟢 [TeamContext] Usuário atual:', user?.email || 'NÃO AUTENTICADO');
-      
-      if (!isMounted) {
-        console.log('⚠️ [TeamContext] Componente desmontado, abortando');
-        return;
-      }
+    // Se não tem usuário, limpar estado
+    if (!user) {
+      console.log('⚠️ [TeamContext] Usuário não autenticado, resetando estado');
+      setAvailableTeams([]);
+      setCurrentTeam(null);
+      setLoading(false);
+      return;
+    }
 
-      if (user) {
-        console.log('🟢 [TeamContext] Usuário autenticado, chamando loadUserTeams()');
-        await loadUserTeams();
-      } else {
-        console.log('⚠️ [TeamContext] Usuário não autenticado, resetando estado');
-        setAvailableTeams([]);
-        setCurrentTeam(null);
-        setLoading(false);
-      }
-    };
+    // Se tem usuário e auth terminou de carregar, carregar teams
+    console.log('🟢 [TeamContext] Auth pronto, usuário autenticado, carregando teams');
+    loadUserTeams();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading]); // loadUserTeams é estável (useCallback), não precisa estar nas deps
 
-    // Aguardar um pouco antes de inicializar para garantir que auth está pronto
-    timeoutId = setTimeout(() => {
-      initializeTeams();
-    }, 50);
-
-    // Escutar mudanças de autenticação
+  // Escutar mudanças de autenticação para casos específicos (SIGNED_OUT)
+  useEffect(() => {
+    console.log('🟢 [TeamContext] Configurando listener de auth state changes...');
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🟢 [TeamContext] onAuthStateChange:', event, session?.user?.email || 'sem sessão');
       
-      if (!isMounted) {
-        console.log('⚠️ [TeamContext] Componente desmontado, ignorando auth change');
-        return;
-      }
-
-      if (event === 'SIGNED_IN' && session) {
-        console.log('🟢 [TeamContext] SIGNED_IN detectado, carregando teams');
-        await loadUserTeams();
-      } else if (event === 'SIGNED_OUT') {
+      // Apenas tratar SIGNED_OUT aqui, SIGNED_IN já é tratado pelo useEffect acima
+      if (event === 'SIGNED_OUT') {
         console.log('🟢 [TeamContext] SIGNED_OUT detectado, limpando estado');
         setAvailableTeams([]);
         setCurrentTeam(null);
@@ -237,47 +226,42 @@ export function TeamProvider({ children }: TeamProviderProps) {
     });
 
     return () => {
-      console.log('🔴 [TeamContext] useEffect PRINCIPAL DESMONTADO (cleanup)');
-      isMounted = false;
-      clearTimeout(timeoutId);
+      console.log('🔴 [TeamContext] Cleanup listener de auth state changes');
       subscription.unsubscribe();
     };
-  }, [loadUserTeams]);
+  }, []);
 
   // ✅ RECOVERY MECHANISM: Se state foi perdido após F5, tentar recuperar
+  // Este effect garante que se os teams foram carregados mas currentTeam não foi setado, ele será setado
   useEffect(() => {
-    // Só tenta recovery uma vez
-    if (recoveryAttemptedRef.current) {
-      console.log('⚠️ [TeamContext] Recovery já foi tentado, ignorando');
-      return;
-    }
-    
-    // Se não está loading e não tem currentTeam mas tem availableTeams
-    if (!loading && !currentTeam && availableTeams.length > 0) {
+    // Se não está carregando e tem teams disponíveis mas não tem team selecionado
+    if (!loading && !authLoading && availableTeams.length > 0 && !currentTeam) {
       const savedTeamId = localStorage.getItem(CURRENT_TEAM_KEY);
       console.log('🔧 [TeamContext] RECOVERY ATIVADO - savedTeamId:', savedTeamId, 'availableTeams:', availableTeams.length);
       
+      let teamToSelect: UserTeam | null = null;
+      
       if (savedTeamId) {
         const savedTeam = availableTeams.find(t => t.team_id === savedTeamId);
-        
         if (savedTeam) {
-          console.log('✅ [TeamContext] RECOVERY - Team recuperado:', savedTeam.team_name);
-          setCurrentTeam(savedTeam);
+          console.log('✅ [TeamContext] RECOVERY - Team recuperado do localStorage:', savedTeam.team_name);
+          teamToSelect = savedTeam;
         } else {
           console.warn('⚠️ [TeamContext] RECOVERY - Team salvo não encontrado, usando primeiro');
-          setCurrentTeam(availableTeams[0]);
-          localStorage.setItem(CURRENT_TEAM_KEY, availableTeams[0].team_id);
+          teamToSelect = availableTeams[0];
         }
-        
-        recoveryAttemptedRef.current = true;
       } else {
         console.log('🔧 [TeamContext] RECOVERY - Nenhum team salvo, selecionando primeiro');
-        setCurrentTeam(availableTeams[0]);
-        localStorage.setItem(CURRENT_TEAM_KEY, availableTeams[0].team_id);
-        recoveryAttemptedRef.current = true;
+        teamToSelect = availableTeams[0];
+      }
+      
+      if (teamToSelect) {
+        setCurrentTeam(teamToSelect);
+        localStorage.setItem(CURRENT_TEAM_KEY, teamToSelect.team_id);
+        console.log('✅ [TeamContext] RECOVERY COMPLETO - Team selecionado:', teamToSelect.team_name);
       }
     }
-  }, [loading, currentTeam, availableTeams]);
+  }, [loading, authLoading, currentTeam, availableTeams]);
 
   // Memoizar o value para evitar re-renders desnecessários
   const value = useMemo<TeamContextType>(() => ({
