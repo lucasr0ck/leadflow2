@@ -1,10 +1,11 @@
 -- ============================================================================
--- MIGRAÇÃO FINAL E DEFINITIVA - GUSTAVO DE CASTRO
+-- MIGRAÇÃO FINAL E DEFINITIVA - GUSTAVO DE CASTRO (CORRIGIDA)
 -- ============================================================================
 -- Corrige TODOS os problemas identificados:
--- 1. clicks2 não tem team_id (será adicionado na migração)
--- 2. sellers/campaigns não tem updated_at
--- 3. Associa tudo ao Gustavo de Castro automaticamente
+-- 1. clicks.id é IDENTITY (não pode inserir manualmente, gera novo)
+-- 2. clicks2 não tem team_id (será adicionado na migração)
+-- 3. sellers/campaigns não tem updated_at
+-- 4. sellers, campaigns, seller_contacts usam UUID (podem manter id)
 -- ============================================================================
 
 DO $$
@@ -34,7 +35,7 @@ BEGIN
   RAISE NOTICE '';
   
   -- ============================================================================
-  -- 2. MIGRAR SELLERS2 → SELLERS
+  -- 2. MIGRAR SELLERS2 → SELLERS (UUID - pode manter id original)
   -- ============================================================================
   
   IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'sellers2') THEN
@@ -62,7 +63,7 @@ BEGIN
   RAISE NOTICE '';
   
   -- ============================================================================
-  -- 3. MIGRAR SELLER_CONTACTS2 → SELLER_CONTACTS
+  -- 3. MIGRAR SELLER_CONTACTS2 → SELLER_CONTACTS (UUID - pode manter id)
   -- ============================================================================
   
   IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'seller_contacts2') THEN
@@ -89,7 +90,7 @@ BEGIN
   RAISE NOTICE '';
   
   -- ============================================================================
-  -- 4. MIGRAR CAMPAIGNS2 → CAMPAIGNS
+  -- 4. MIGRAR CAMPAIGNS2 → CAMPAIGNS (UUID - pode manter id)
   -- ============================================================================
   
   IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'campaigns2') THEN
@@ -122,15 +123,16 @@ BEGIN
   RAISE NOTICE '';
   
   -- ============================================================================
-  -- 5. MIGRAR CLICKS2 → CLICKS (SEM clicked_at, COM team_id)
+  -- 5. MIGRAR CLICKS2 → CLICKS (INT IDENTITY - GERA NOVO ID)
   -- ============================================================================
   
   IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'clicks2') THEN
     RAISE NOTICE '📦 Migrando clicks2 → clicks...';
     
+    -- ⚠️ IMPORTANTE: clicks.id é IDENTITY (auto-increment)
+    -- Não podemos inserir o id original, será gerado novo
     -- clicks2 tem: id, campaign_id, seller_id, created_at
     -- clicks tem: id (IDENTITY), campaign_id, seller_id, team_id, created_at
-    -- IMPORTANTE: id é GENERATED ALWAYS, usar OVERRIDING SYSTEM VALUE
     INSERT INTO clicks (campaign_id, seller_id, team_id, created_at)
     SELECT 
       campaign_id,
@@ -140,7 +142,7 @@ BEGIN
     FROM clicks2;
     
     GET DIAGNOSTICS v_clicks_migrados = ROW_COUNT;
-    RAISE NOTICE '✅ Clicks migrados: %', v_clicks_migrados;
+    RAISE NOTICE '✅ Clicks migrados: % (novos IDs gerados)', v_clicks_migrados;
   ELSE
     RAISE NOTICE '⚠️  Tabela clicks2 não existe';
   END IF;
@@ -158,7 +160,7 @@ BEGIN
   RAISE NOTICE '  ✅ Vendedores: %', v_sellers_migrados;
   RAISE NOTICE '  ✅ Contatos: %', v_contacts_migrados;
   RAISE NOTICE '  ✅ Campanhas: %', v_campanhas_migradas;
-  RAISE NOTICE '  ✅ Clicks: %', v_clicks_migrados;
+  RAISE NOTICE '  ✅ Clicks: % (novos IDs)', v_clicks_migrados;
   RAISE NOTICE '';
   RAISE NOTICE 'Totais no Gustavo de Castro:';
   RAISE NOTICE '  📊 Vendedores: %', (SELECT COUNT(*) FROM sellers WHERE team_id = v_team_gustavo);
@@ -177,7 +179,7 @@ SELECT
   s.name as vendedor,
   s.weight,
   (SELECT COUNT(*) FROM seller_contacts WHERE seller_id = s.id) as contatos,
-  (SELECT COUNT(*) FROM clicks WHERE seller_id = s.id) as clicks
+  (SELECT COUNT(*) FROM clicks WHERE seller_id = s.id) as clicks_totais
 FROM sellers s
 WHERE s.team_id = (SELECT id FROM teams WHERE slug = 'gustavo-de-castro')
 ORDER BY s.name;
