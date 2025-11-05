@@ -182,9 +182,15 @@ export function TeamProvider({ children }: TeamProviderProps) {
   useEffect(() => {
     console.log('🟢 [TeamContext] useEffect PRINCIPAL MONTADO/RE-MONTADO');
     let isMounted = true;
+    let timeoutId: ReturnType<typeof setTimeout>;
 
     const initializeTeams = async () => {
       console.log('🟢 [TeamContext] initializeTeams INICIOU');
+      
+      // ⚠️ CRITICAL FIX: Aguardar auth estar pronto antes de buscar teams
+      console.log('🟢 [TeamContext] Aguardando 100ms para auth estar pronto...');
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       const { data: { user } } = await supabase.auth.getUser();
       console.log('🟢 [TeamContext] Usuário atual:', user?.email || 'NÃO AUTENTICADO');
       
@@ -204,7 +210,10 @@ export function TeamProvider({ children }: TeamProviderProps) {
       }
     };
 
-    initializeTeams();
+    // Aguardar um pouco antes de inicializar para garantir que auth está pronto
+    timeoutId = setTimeout(() => {
+      initializeTeams();
+    }, 50);
 
     // Escutar mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -230,6 +239,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
     return () => {
       console.log('🔴 [TeamContext] useEffect PRINCIPAL DESMONTADO (cleanup)');
       isMounted = false;
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, [loadUserTeams]);
