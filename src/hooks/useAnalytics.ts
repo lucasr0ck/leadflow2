@@ -37,7 +37,7 @@ interface DateRange {
 
 export const useAnalytics = (dateRange: DateRange) => {
   const { user } = useAuth();
-  const { currentTeam, loading: teamLoading } = useTeam();
+  const { currentTeam } = useTeam();
   const [analytics, setAnalytics] = useState<AnalyticsData>({
     totalClicks: 0,
     previousPeriodClicks: 0,
@@ -50,18 +50,11 @@ export const useAnalytics = (dateRange: DateRange) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('[useAnalytics] useEffect triggered:', { 
+    console.log('[useAnalytics] Effect triggered:', { 
       hasUser: !!user, 
       hasTeam: !!currentTeam, 
-      teamLoading,
       teamId: currentTeam?.team_id 
     });
-    
-    // ⚠️ CRITICAL FIX: Aguardar teams carregarem
-    if (teamLoading) {
-      console.log('[useAnalytics] Aguardando teams carregarem...');
-      return;
-    }
     
     if (user && currentTeam) {
       console.log('[useAnalytics] Fetching analytics for team:', currentTeam.team_name);
@@ -71,7 +64,7 @@ export const useAnalytics = (dateRange: DateRange) => {
       setError('Selecione uma operação para ver os analytics');
       setLoading(false);
     }
-  }, [user, currentTeam?.team_id, dateRange, teamLoading]);
+  }, [user, currentTeam?.team_id, dateRange]);
 
   const fetchAnalytics = async () => {
     // ✅ CRITICAL FIX: Validate currentTeam exists
@@ -230,5 +223,5 @@ export const useAnalytics = (dateRange: DateRange) => {
     }
   };
 
-  return { analytics, loading: loading || teamLoading, error, refetch: fetchAnalytics };
+  return { analytics, loading, error, refetch: fetchAnalytics };
 };

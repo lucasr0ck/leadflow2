@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge';
 
 export const DiagnosticPanel = () => {
   const { user, loading: authLoading } = useAuth();
-  const { isContextReady, loading: teamLoading, currentTeam, availableTeams } = useTeam();
+  const { loading: teamLoading, currentTeam, availableTeams } = useTeam();
+
+  const isReady = !authLoading && !teamLoading && !!user && !!currentTeam;
 
   return (
     <Card className="fixed bottom-4 right-4 w-96 max-h-96 overflow-auto z-50 bg-white shadow-lg border-2 border-orange-500">
@@ -24,7 +26,6 @@ export const DiagnosticPanel = () => {
           <strong>Team:</strong>
           <div className="ml-2 space-y-1">
             <div>Loading: <Badge variant={teamLoading ? "destructive" : "default"}>{teamLoading ? "SIM" : "NÃO"}</Badge></div>
-            <div>Ready: <Badge variant={isContextReady ? "default" : "destructive"}>{isContextReady ? "SIM" : "NÃO"}</Badge></div>
             <div>Current Team: <Badge variant={currentTeam ? "default" : "destructive"}>{currentTeam?.team_name || "NÃO"}</Badge></div>
             <div>Available: <Badge>{availableTeams.length}</Badge></div>
           </div>
@@ -34,8 +35,8 @@ export const DiagnosticPanel = () => {
           <div className="mt-1">
             {authLoading && <Badge variant="destructive">Aguardando Auth...</Badge>}
             {!authLoading && !user && <Badge variant="destructive">Não autenticado</Badge>}
-            {!authLoading && user && (!isContextReady || teamLoading) && <Badge variant="destructive">Aguardando Team...</Badge>}
-            {!authLoading && user && isContextReady && !teamLoading && <Badge variant="default">Pronto ✅</Badge>}
+            {!authLoading && user && teamLoading && <Badge variant="destructive">Aguardando Team...</Badge>}
+            {isReady && <Badge variant="default">Pronto ✅</Badge>}
           </div>
         </div>
       </CardContent>
