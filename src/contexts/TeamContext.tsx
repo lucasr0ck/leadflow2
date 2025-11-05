@@ -8,6 +8,7 @@ interface TeamContextType {
   currentTeam: UserTeam | null;
   availableTeams: UserTeam[];
   loading: boolean;
+  isContextReady: boolean; // Indica se o contexto está totalmente pronto (user autenticado + team carregado/selecionado)
   switchTeam: (teamId: string) => void;
   refreshTeams: () => Promise<void>;
 }
@@ -41,6 +42,8 @@ export function TeamProvider({ children }: TeamProviderProps) {
   const [currentTeam, setCurrentTeam] = useState<UserTeam | null>(null);
   const [availableTeams, setAvailableTeams] = useState<UserTeam[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isContextReady, setIsContextReady] = useState(false);
+  const [teamsLoaded, setTeamsLoaded] = useState(false); // Flag para prevenir refetch desnecessário
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const isLoadingRef = useRef(false);
@@ -69,6 +72,8 @@ export function TeamProvider({ children }: TeamProviderProps) {
         console.log('❌ [TeamContext] Usuário não autenticado, resetando estado');
         setAvailableTeams([]);
         setCurrentTeam(null);
+        setTeamsLoaded(false);
+        setIsContextReady(false);
         setLoading(false);
         return;
       }
@@ -100,6 +105,8 @@ export function TeamProvider({ children }: TeamProviderProps) {
         }
         setAvailableTeams([]);
         setCurrentTeam(null);
+        setTeamsLoaded(false);
+        setIsContextReady(false);
         setLoading(false);
         return;
       }
@@ -117,6 +124,8 @@ export function TeamProvider({ children }: TeamProviderProps) {
       if (teams.length === 0) {
         console.log('⚠️ [TeamContext] NENHUM team encontrado para o usuário');
         setCurrentTeam(null);
+        setTeamsLoaded(true); // Teams foram carregados (mesmo que vazio)
+        setIsContextReady(false); // Mas não está pronto pois não tem team selecionado
         setLoading(false);
         return;
       }
@@ -139,11 +148,16 @@ export function TeamProvider({ children }: TeamProviderProps) {
 
       // IMPORTANTE: Setar currentTeam ANTES de setLoading(false) para evitar race conditions
       setCurrentTeam(teamToSelect);
+      setTeamsLoaded(true); // Marca que teams foram carregados
+      setIsContextReady(true); // Contexto está pronto - user autenticado + team selecionado
       console.log('✅ [TeamContext] currentTeam setado:', teamToSelect.team_name);
+      console.log('✅ [TeamContext] isContextReady = true');
       console.log('✅ [TeamContext] setLoading(false) - Carregamento completo');
       setLoading(false);
     } catch (err) {
       console.error('❌ [TeamContext] ERRO INESPERADO ao carregar teams:', err);
+      setTeamsLoaded(false);
+      setIsContextReady(false);
       setLoading(false);
     } finally {
       console.log('🔵 [TeamContext] isLoadingRef = false (finally)');
@@ -180,16 +194,21 @@ export function TeamProvider({ children }: TeamProviderProps) {
 
   // Recarregar teams (útil após criar novo team ou ser adicionado a um)
   const refreshTeams = async () => {
+    console.log('🟣 [TeamContext] refreshTeams chamado - resetando flags e recarregando');
+    setTeamsLoaded(false); // Resetar flag para permitir recarregar
+    setIsContextReady(false);
     await loadUserTeams();
   };
 
-  // Carregar teams quando auth mudar - DEPENDÊNCIA DIRETA NO user E authLoading
+  // ✅ CRITICAL FIX: Carregar teams apenas UMA VEZ quando autenticado
+  // Este effect só roda quando authState muda ou quando teams ainda não foram carregados
   useEffect(() => {
-    console.log('🟢 [TeamContext] useEffect PRINCIPAL - authLoading:', authLoading, 'user:', user?.email || 'null');
+    console.log('🟢 [TeamContext] useEffect PRINCIPAL - authLoading:', authLoading, 'user:', user?.email || 'null', 'teamsLoaded:', teamsLoaded);
     
     // Se auth ainda está carregando, aguardar
     if (authLoading) {
       console.log('🟢 [TeamContext] Auth ainda carregando, aguardando...');
+      setIsContextReady(false);
       return;
     }
 
@@ -198,15 +217,34 @@ export function TeamProvider({ children }: TeamProviderProps) {
       console.log('⚠️ [TeamContext] Usuário não autenticado, resetando estado');
       setAvailableTeams([]);
       setCurrentTeam(null);
+      setTeamsLoaded(false);
+      setIsContextReady(false);
       setLoading(false);
       return;
     }
 
-    // Se tem usuário e auth terminou de carregar, carregar teams
-    console.log('🟢 [TeamContext] Auth pronto, usuário autenticado, carregando teams');
-    loadUserTeams();
+    // ✅ MÁGICA: Só carregar teams se ainda não foram carregados
+    // Isso previne refetch desnecessário em cada navegação
+    if (user && !teamsLoaded) {
+      console.log('🟢 [TeamContext] Auth pronto, usuário autenticado, teams NÃO carregados ainda - carregando teams...');
+      loadUserTeams();
+    } else if (user && teamsLoaded) {
+      // Teams já foram carregados
+      if (currentTeam) {
+        // Tem team selecionado - contexto está pronto
+        console.log('🟢 [TeamContext] Teams já carregados e team selecionado - contexto pronto');
+        setIsContextReady(true);
+      } else if (availableTeams.length > 0) {
+        // Tem teams mas nenhum selecionado - recovery mechanism vai lidar com isso
+        console.log('🟢 [TeamContext] Teams carregados mas nenhum selecionado - aguardando recovery');
+      } else {
+        // Teams carregados mas vazios - usuário precisa criar um
+        console.log('🟢 [TeamContext] Teams carregados mas vazios - usuário precisa criar um');
+        setIsContextReady(false);
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading]); // loadUserTeams é estável (useCallback), não precisa estar nas deps
+  }, [user, authLoading, teamsLoaded]); // teamsLoaded na deps previne refetch
 
   // Escutar mudanças de autenticação para casos específicos (SIGNED_OUT)
   useEffect(() => {
@@ -220,6 +258,8 @@ export function TeamProvider({ children }: TeamProviderProps) {
         console.log('🟢 [TeamContext] SIGNED_OUT detectado, limpando estado');
         setAvailableTeams([]);
         setCurrentTeam(null);
+        setTeamsLoaded(false);
+        setIsContextReady(false);
         localStorage.removeItem(CURRENT_TEAM_KEY);
         setLoading(false);
       }
@@ -257,8 +297,10 @@ export function TeamProvider({ children }: TeamProviderProps) {
       
       if (teamToSelect) {
         setCurrentTeam(teamToSelect);
+        setIsContextReady(true); // Marcar contexto como pronto após recovery
         localStorage.setItem(CURRENT_TEAM_KEY, teamToSelect.team_id);
         console.log('✅ [TeamContext] RECOVERY COMPLETO - Team selecionado:', teamToSelect.team_name);
+        console.log('✅ [TeamContext] isContextReady = true (recovery)');
       }
     }
   }, [loading, authLoading, currentTeam, availableTeams]);
@@ -268,9 +310,10 @@ export function TeamProvider({ children }: TeamProviderProps) {
     currentTeam,
     availableTeams,
     loading,
+    isContextReady,
     switchTeam,
     refreshTeams,
-  }), [currentTeam, availableTeams, loading, switchTeam, refreshTeams]);
+  }), [currentTeam, availableTeams, loading, isContextReady, switchTeam, refreshTeams]);
 
   return <TeamContext.Provider value={value}>{children}</TeamContext.Provider>;
 }
