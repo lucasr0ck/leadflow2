@@ -26,6 +26,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
   const { toast } = useToast();
   const isLoadingRef = useRef(false);
   const hasInitializedRef = useRef(false);
+  const recoveryAttemptedRef = useRef(false);
 
   // Carregar teams do usuário
   const loadUserTeams = useCallback(async () => {
@@ -133,14 +134,13 @@ export function TeamProvider({ children }: TeamProviderProps) {
 
   // Carregar teams quando o componente montar e quando auth mudar
   useEffect(() => {
-    // Prevenir múltiplas inicializações
-    if (hasInitializedRef.current) {
-      console.log('TeamContext: Já inicializado, ignorando');
-      return;
-    }
+    console.log('TeamContext: useEffect running, hasInitialized:', hasInitializedRef.current);
     
-    hasInitializedRef.current = true;
-    console.log('TeamContext: Inicializando...');
+    // ✅ FIX CRÍTICO: Não use hasInitializedRef para prevenir execução
+    // Deixe o useEffect executar normalmente no mount
+    // O isLoadingRef já previne chamadas duplicadas
+    
+    console.log('TeamContext: Inicializando/Re-inicializando...');
     
     // Carregar teams inicialmente
     loadUserTeams();
@@ -164,9 +164,36 @@ export function TeamProvider({ children }: TeamProviderProps) {
     return () => {
       console.log('TeamContext: Limpando subscription');
       subscription.unsubscribe();
-      hasInitializedRef.current = false;
+      // ✅ NÃO resete hasInitializedRef - causa o bug de F5
     };
-  }, []); // Array vazio - só executa uma vez
+  }, []); // Array vazio - executa no mount e cria subscription
+
+  // ✅ RECOVERY MECHANISM: Se state foi perdido após F5, tentar recuperar
+  useEffect(() => {
+    // Só tenta recovery uma vez
+    if (recoveryAttemptedRef.current) return;
+    
+    // Se não está loading e não tem currentTeam mas tem savedTeamId
+    if (!loading && !currentTeam && availableTeams.length > 0) {
+      const savedTeamId = localStorage.getItem(CURRENT_TEAM_KEY);
+      
+      if (savedTeamId) {
+        console.log('TeamContext: RECOVERY - Detectado state perdido, recuperando team:', savedTeamId);
+        const savedTeam = availableTeams.find(t => t.team_id === savedTeamId);
+        
+        if (savedTeam) {
+          setCurrentTeam(savedTeam);
+          console.log('TeamContext: RECOVERY - Team recuperado:', savedTeam.team_name);
+        } else {
+          console.warn('TeamContext: RECOVERY - Team salvo não encontrado, usando primeiro');
+          setCurrentTeam(availableTeams[0]);
+          localStorage.setItem(CURRENT_TEAM_KEY, availableTeams[0].team_id);
+        }
+        
+        recoveryAttemptedRef.current = true;
+      }
+    }
+  }, [loading, currentTeam, availableTeams]);
 
   // Memoizar o value para evitar re-renders desnecessários
   const value = useMemo<TeamContextType>(() => ({

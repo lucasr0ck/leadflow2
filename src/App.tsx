@@ -22,6 +22,7 @@ import { AuditLogs } from '@/pages/AuditLogs';
 import { TeamManagement } from '@/pages/TeamManagement';
 import NotFound from "./pages/NotFound";
 import { RobustErrorBoundary } from '@/components/RobustErrorBoundary';
+import { DebugPanel } from '@/components/DebugPanel';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,6 +32,9 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Debug mode flag
+const DEBUG_MODE = process.env.NODE_ENV === 'development' || localStorage.getItem('LEADFLOW_DEBUG') === 'true';
 
 const AppRoutes = () => {
   const { user, loading } = useAuth();
@@ -156,6 +160,7 @@ const App = () => (
           <BrowserRouter>
             <RobustErrorBoundary>
               <AppRoutes />
+              {DEBUG_MODE && <DebugPanel />}
             </RobustErrorBoundary>
           </BrowserRouter>
         </TooltipProvider>
