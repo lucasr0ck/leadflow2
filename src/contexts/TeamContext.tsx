@@ -50,11 +50,14 @@ export function TeamProvider({ children }: TeamProviderProps) {
 
   // Carregar teams do usuário
   const loadUserTeams = useCallback(async () => {
-    console.log('🔵 [TeamContext] loadUserTeams INICIOU');
+    const startTime = Date.now();
+    console.group('🔵 [TeamContext] loadUserTeams INICIOU');
+    console.log('📍 Timestamp:', new Date().toISOString());
     
     // Prevenir chamadas simultâneas
     if (isLoadingRef.current) {
-      console.log('⚠️ [TeamContext] Já está carregando, ignorando chamada duplicada');
+      console.warn('⚠️ [TeamContext] Já está carregando, ignorando chamada duplicada');
+      console.groupEnd();
       return;
     }
 
@@ -65,28 +68,50 @@ export function TeamProvider({ children }: TeamProviderProps) {
       setLoading(true);
       
       console.log('🔵 [TeamContext] Buscando usuário autenticado...');
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log('🔵 [TeamContext] Usuário:', user?.email || 'NÃO AUTENTICADO');
+      const userStartTime = Date.now();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const userElapsed = ((Date.now() - userStartTime) / 1000).toFixed(2);
+      console.log(`🔵 [TeamContext] Usuário obtido (${userElapsed}s):`, user?.email || 'NÃO AUTENTICADO', userError || 'sem erro');
       
       if (!user) {
-        console.log('❌ [TeamContext] Usuário não autenticado, resetando estado');
+        console.error('❌ [TeamContext] Usuário não autenticado, resetando estado');
         setAvailableTeams([]);
         setCurrentTeam(null);
         setTeamsLoaded(false);
         setIsContextReady(false);
         setLoading(false);
+        console.groupEnd();
         return;
       }
 
       // Chamar função do Supabase que retorna os teams do usuário
-      console.log('🔵 [TeamContext] Chamando get_user_teams()...');
+      console.log(`🔵 [TeamContext] Chamando get_user_teams() com user_id: ${user.id}...`);
+      const rpcStartTime = Date.now();
       const { data, error } = await supabase.rpc('get_user_teams', {
         user_id_param: user.id,
       });
-      console.log('🔵 [TeamContext] Resposta get_user_teams:', { data, error });
+      const rpcElapsed = ((Date.now() - rpcStartTime) / 1000).toFixed(2);
+      console.log(`🔵 [TeamContext] Resposta get_user_teams (${rpcElapsed}s):`, {
+        dataLength: data?.length || 0,
+        data: data,
+        error: error ? {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        } : null,
+      });
 
       if (error) {
-        console.error('❌ [TeamContext] ERRO ao carregar teams:', error);
+        const totalElapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+        console.error(`❌ [TeamContext] ERRO ao carregar teams (${totalElapsed}s):`, {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          fullError: error,
+        });
+        
         // Se a função não existe, significa que as migrations não foram executadas
         if (error.message?.includes('function') || error.message?.includes('does not exist')) {
           console.error('❌ [TeamContext] Função get_user_teams() NÃO EXISTE - Migrations não executadas!');
@@ -108,6 +133,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
         setTeamsLoaded(false);
         setIsContextReady(false);
         setLoading(false);
+        console.groupEnd();
         return;
       }
 
@@ -150,15 +176,28 @@ export function TeamProvider({ children }: TeamProviderProps) {
       setCurrentTeam(teamToSelect);
       setTeamsLoaded(true); // Marca que teams foram carregados
       setIsContextReady(true); // Contexto está pronto - user autenticado + team selecionado
-      console.log('✅ [TeamContext] currentTeam setado:', teamToSelect.team_name);
+      
+      const totalElapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.log(`✅ [TeamContext] currentTeam setado: ${teamToSelect.team_name} (${totalElapsed}s)`);
       console.log('✅ [TeamContext] isContextReady = true');
       console.log('✅ [TeamContext] setLoading(false) - Carregamento completo');
+      console.log('📍 Estado final:', {
+        teamsCount: teams.length,
+        currentTeamId: teamToSelect.team_id,
+        currentTeamName: teamToSelect.team_name,
+        teamsLoaded: true,
+        isContextReady: true,
+      });
       setLoading(false);
+      console.groupEnd();
     } catch (err) {
-      console.error('❌ [TeamContext] ERRO INESPERADO ao carregar teams:', err);
+      const totalElapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.error(`❌ [TeamContext] ERRO INESPERADO ao carregar teams (${totalElapsed}s):`, err);
+      console.error('📍 Stack trace:', err instanceof Error ? err.stack : 'N/A');
       setTeamsLoaded(false);
       setIsContextReady(false);
       setLoading(false);
+      console.groupEnd();
     } finally {
       console.log('🔵 [TeamContext] isLoadingRef = false (finally)');
       isLoadingRef.current = false;

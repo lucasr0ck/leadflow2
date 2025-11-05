@@ -23,6 +23,7 @@ import { TeamManagement } from '@/pages/TeamManagement';
 import NotFound from "./pages/NotFound";
 import { RobustErrorBoundary } from '@/components/RobustErrorBoundary';
 import { DebugPanel } from '@/components/DebugPanel';
+import { DiagnosticPanel } from '@/components/DiagnosticPanel';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,6 +36,9 @@ const queryClient = new QueryClient({
 
 // Debug mode flag
 const DEBUG_MODE = process.env.NODE_ENV === 'development' || localStorage.getItem('LEADFLOW_DEBUG') === 'true';
+
+// Diagnostic panel - sempre ativo em dev, ou com flag LEADFLOW_DIAGNOSTIC
+const SHOW_DIAGNOSTIC = process.env.NODE_ENV === 'development' || localStorage.getItem('LEADFLOW_DIAGNOSTIC') === 'true';
 
 const AppRoutes = () => {
   const { user, loading } = useAuth();
@@ -161,6 +165,7 @@ const App = () => (
             <RobustErrorBoundary>
               <AppRoutes />
               {DEBUG_MODE && <DebugPanel />}
+              {SHOW_DIAGNOSTIC && <DiagnosticPanel />}
             </RobustErrorBoundary>
           </BrowserRouter>
         </TooltipProvider>
