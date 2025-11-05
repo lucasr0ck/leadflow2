@@ -68,15 +68,27 @@ export function TeamProvider({ children }: TeamProviderProps) {
 
     const loadTeams = async () => {
       console.log('[TeamContext] Loading teams for:', user.email);
+      console.log('[TeamContext] User ID:', user.id);
       setLoading(true);
 
       try {
+        console.log('[TeamContext] 🔍 Calling supabase.rpc(get_user_teams)...');
+        
         const { data, error } = await supabase.rpc('get_user_teams', {
           user_id_param: user.id,
         });
 
+        console.log('[TeamContext] 🔍 RPC Response:');
+        console.log('[TeamContext] - Data:', data);
+        console.log('[TeamContext] - Error:', error);
+
         if (error) {
-          console.error('[TeamContext] Error:', error);
+          console.error('[TeamContext] ❌ RPC Error:', {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+          });
           toastRef.current({
             title: "Erro ao carregar operações",
             description: error.message,
