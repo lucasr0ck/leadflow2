@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTeam } from '@/contexts/TeamContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -36,6 +37,7 @@ interface DateRange {
 
 export const useAnalytics = (dateRange: DateRange) => {
   const { user } = useAuth();
+  const { currentTeam, loading: teamLoading } = useTeam();
   const [analytics, setAnalytics] = useState<AnalyticsData>({
     totalClicks: 0,
     previousPeriodClicks: 0,
@@ -48,32 +50,49 @@ export const useAnalytics = (dateRange: DateRange) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
+    console.log('[useAnalytics] useEffect triggered:', { 
+      hasUser: !!user, 
+      hasTeam: !!currentTeam, 
+      teamLoading,
+      teamId: currentTeam?.team_id 
+    });
+    
+    if (user && currentTeam && !teamLoading) {
+      console.log('[useAnalytics] Fetching analytics for team:', currentTeam.team_name);
       fetchAnalytics();
+    } else if (!teamLoading && !currentTeam) {
+      console.warn('[useAnalytics] No team selected');
+      setError('Selecione uma operação para ver os analytics');
+      setLoading(false);
     }
-  }, [user, dateRange]);
+  }, [user, currentTeam?.team_id, dateRange, teamLoading]);
 
   const fetchAnalytics = async () => {
+    // ✅ CRITICAL FIX: Validate currentTeam exists
+    if (!currentTeam) {
+      console.error('[useAnalytics] fetchAnalytics called without currentTeam!');
+      setError('Nenhuma operação selecionada');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     
     try {
-      // Get user's team
-      const { data: team, error: teamError } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('owner_id', user!.id)
-        .single();
-
-      if (teamError || !team) {
-        throw new Error('Time não encontrado');
-      }
+      console.log('[useAnalytics] fetchAnalytics: Using team from context:', {
+        teamId: currentTeam.team_id,
+        teamName: currentTeam.team_name
+      });
 
       // Use RPC functions for optimized queries (no 1000 row limit!)
       const startDate = dateRange.start.toISOString();
       const endDate = dateRange.end.toISOString();
+      const teamId = currentTeam.team_id;
 
       // Fetch all analytics data in parallel
+      console.log('[useAnalytics] Fetching data for period:', { startDate, endDate, teamId });
+      
       const [
         totalClicksResult,
         comparisonResult,
@@ -83,46 +102,68 @@ export const useAnalytics = (dateRange: DateRange) => {
       ] = await Promise.all([
         // Total clicks (single number, very fast)
         supabase.rpc('get_total_clicks', {
-          team_id_param: team.id,
+          team_id_param: teamId,
           start_date: startDate,
           end_date: endDate
         }),
         
         // Comparison with previous period
         supabase.rpc('get_analytics_comparison', {
-          team_id_param: team.id,
+          team_id_param: teamId,
           start_date: startDate,
           end_date: endDate
         }),
         
         // Campaign statistics (aggregated)
         supabase.rpc('get_campaign_analytics', {
-          team_id_param: team.id,
+          team_id_param: teamId,
           start_date: startDate,
           end_date: endDate
         }),
         
         // Seller performance with efficiency scores
         supabase.rpc('get_seller_performance', {
-          team_id_param: team.id,
+          team_id_param: teamId,
           start_date: startDate,
           end_date: endDate
         }),
         
         // Daily clicks aggregation
         supabase.rpc('get_daily_clicks', {
-          team_id_param: team.id,
+          team_id_param: teamId,
           start_date: startDate,
           end_date: endDate
         })
       ]);
 
-      // Check for errors
-      if (totalClicksResult.error) throw totalClicksResult.error;
-      if (comparisonResult.error) throw comparisonResult.error;
-      if (campaignStatsResult.error) throw campaignStatsResult.error;
-      if (sellerPerformanceResult.error) throw sellerPerformanceResult.error;
-      if (dailyClicksResult.error) throw dailyClicksResult.error;
+      // Check for errors (gracefully)
+      if (totalClicksResult.error) {
+        console.error('[useAnalytics] Error fetching total clicks:', totalClicksResult.error);
+        throw new Error(`Erro ao buscar total de clicks: ${totalClicksResult.error.message}`);
+      }
+      if (comparisonResult.error) {
+        console.error('[useAnalytics] Error fetching comparison:', comparisonResult.error);
+        // Non-critical, continue
+      }
+      if (campaignStatsResult.error) {
+        console.error('[useAnalytics] Error fetching campaign stats:', campaignStatsResult.error);
+        throw new Error(`Erro ao buscar estatísticas de campanhas: ${campaignStatsResult.error.message}`);
+      }
+      if (sellerPerformanceResult.error) {
+        console.error('[useAnalytics] Error fetching seller performance:', sellerPerformanceResult.error);
+        throw new Error(`Erro ao buscar performance de vendedores: ${sellerPerformanceResult.error.message}`);
+      }
+      if (dailyClicksResult.error) {
+        console.error('[useAnalytics] Error fetching daily clicks:', dailyClicksResult.error);
+        throw new Error(`Erro ao buscar clicks diários: ${dailyClicksResult.error.message}`);
+      }
+      
+      console.log('[useAnalytics] Data fetched successfully:', {
+        totalClicks: totalClicksResult.data,
+        campaigns: campaignStatsResult.data?.length,
+        sellers: sellerPerformanceResult.data?.length,
+        days: dailyClicksResult.data?.length
+      });
 
       // Process comparison data
       const comparison = Array.isArray(comparisonResult.data) 
@@ -163,12 +204,25 @@ export const useAnalytics = (dateRange: DateRange) => {
       });
 
     } catch (err: any) {
-      console.error('Error fetching analytics:', err);
-      setError(err.message || 'Erro ao carregar analytics');
+      console.error('[useAnalytics] ERROR:', err);
+      // ✅ CRITICAL FIX: Set error but DON'T corrupt global state
+      const errorMessage = err.message || 'Erro desconhecido ao carregar analytics';
+      setError(errorMessage);
+      
+      // Set empty analytics to prevent UI crash
+      setAnalytics({
+        totalClicks: 0,
+        previousPeriodClicks: 0,
+        growthPercentage: 0,
+        campaignStats: [],
+        sellerStats: [],
+        dailyClicks: []
+      });
     } finally {
+      console.log('[useAnalytics] fetchAnalytics complete');
       setLoading(false);
     }
   };
 
-  return { analytics, loading, error, refetch: fetchAnalytics };
+  return { analytics, loading: loading || teamLoading, error, refetch: fetchAnalytics };
 };
