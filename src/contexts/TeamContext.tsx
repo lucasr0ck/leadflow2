@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { supabase } from '@/integrations/supabase/client';
 import { UserTeam } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
-import type { PostgrestError } from '@supabase/supabase-js';
 
 interface TeamContextType {
   currentTeam: UserTeam | null;
@@ -30,60 +29,11 @@ const normalizeMemberCount = (value: unknown): number => {
     return Number.isNaN(parsed) ? 0 : parsed;
   }
 
-  return 0;
-};
-
-const loadTeamsViaFallback = async (userId: string): Promise<UserTeam[]> => {
-  console.log('🟡 [TeamContext] Ativando fallback para carregar operações via relações diretas');
-
-  const { data, error } = await supabase
-    .from('teams')
-    .select(`
-      id,
-      team_name,
-      slug,
-      description,
-      is_active,
-      memberships:team_members!inner (
-        user_id,
-        role,
-        joined_at
-      ),
-      member_count:team_members(count)
-    `)
-    .eq('memberships.user_id', userId)
-    .order('team_name');
-
-  if (error) {
-    console.error('❌ [TeamContext] Fallback falhou ao carregar operações:', error);
-    throw error;
+  if (typeof value === 'bigint') {
+    return Number(value);
   }
 
-  const teams: UserTeam[] = (data || [])
-    .map(team => {
-      const membership = team.memberships?.[0];
-      if (!membership) {
-        return null;
-      }
-
-      const rawCount = team.member_count?.[0]?.count ?? team.memberships?.length ?? 0;
-
-      return {
-        team_id: team.id,
-        team_name: team.team_name,
-        team_slug: team.slug,
-        description: team.description,
-        role: membership.role,
-        is_active: team.is_active,
-        member_count: normalizeMemberCount(rawCount),
-        joined_at: membership.joined_at,
-      } satisfies UserTeam;
-    })
-    .filter((team): team is UserTeam => team !== null);
-
-  console.log('🟡 [TeamContext] Fallback retornou', teams.length, 'operações');
-
-  return teams;
+  return 0;
 };
 
 export function TeamProvider({ children }: TeamProviderProps) {
@@ -124,50 +74,39 @@ export function TeamProvider({ children }: TeamProviderProps) {
 
       // Chamar função do Supabase que retorna os teams do usuário
       console.log('🔵 [TeamContext] Chamando get_user_teams()...');
-      const { data, error } = await supabase.rpc('get_user_teams');
+      const { data, error } = await supabase.rpc('get_user_teams', {
+        user_id_param: user.id,
+      });
       console.log('🔵 [TeamContext] Resposta get_user_teams:', { data, error });
-
-      let teams: UserTeam[] | null = null;
 
       if (error) {
         console.error('❌ [TeamContext] ERRO ao carregar teams:', error);
-
-        const shouldUseFallback = (error as PostgrestError).code === '42702';
-
-        if (shouldUseFallback) {
-          console.warn('🟡 [TeamContext] Detectado erro de ambiguidade em get_user_teams. Tentando fallback com query direta.');
-          teams = await loadTeamsViaFallback(user.id);
+        // Se a função não existe, significa que as migrations não foram executadas
+        if (error.message?.includes('function') || error.message?.includes('does not exist')) {
+          console.error('❌ [TeamContext] Função get_user_teams() NÃO EXISTE - Migrations não executadas!');
+          toast({
+            title: "⚠️ Migrations não executadas",
+            description: "Execute as migrations do Supabase antes de usar a aplicação. Veja DEPLOY_EASYPANEL.md",
+            variant: "destructive",
+          });
         } else {
-          // Se a função não existe, significa que as migrations não foram executadas
-          if (error.message?.includes('function') || error.message?.includes('does not exist')) {
-            console.error('❌ [TeamContext] Função get_user_teams() NÃO EXISTE - Migrations não executadas!');
-            toast({
-              title: "⚠️ Migrations não executadas",
-              description: "Execute as migrations do Supabase antes de usar a aplicação. Veja DEPLOY_EASYPANEL.md",
-              variant: "destructive",
-            });
-          } else {
-            console.error('❌ [TeamContext] Erro desconhecido:', error.message);
-            toast({
-              title: "Erro ao carregar operações",
-              description: error.message,
-              variant: "destructive",
-            });
-          }
-          setAvailableTeams([]);
-          setCurrentTeam(null);
-          setLoading(false);
-          return;
+          console.error('❌ [TeamContext] Erro desconhecido:', error.message);
+          toast({
+            title: "Erro ao carregar operações",
+            description: error.message,
+            variant: "destructive",
+          });
         }
+        setAvailableTeams([]);
+        setCurrentTeam(null);
+        setLoading(false);
+        return;
       }
 
-      if (!teams) {
-        const rpcTeams = (data || []) as UserTeam[];
-        teams = rpcTeams.map(team => ({
-          ...team,
-          member_count: normalizeMemberCount(team.member_count),
-        }));
-      }
+      const teams = ((data || []) as UserTeam[]).map(team => ({
+        ...team,
+        member_count: normalizeMemberCount(team.member_count),
+      }));
 
       console.log('✅ [TeamContext] Teams recebidos:', teams.length, 'teams');
       console.log('✅ [TeamContext] Detalhes teams:', teams);
