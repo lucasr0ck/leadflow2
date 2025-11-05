@@ -148,9 +148,13 @@ export function TeamProvider({ children }: TeamProviderProps) {
 
   // Trocar de operação
   const switchTeam = (teamId: string) => {
+    console.log('🟣 [TeamContext] switchTeam CALLED with teamId:', teamId);
+    console.log('🟣 [TeamContext] availableTeams:', availableTeams.length);
+    
     const team = availableTeams.find(t => t.team_id === teamId);
     
     if (!team) {
+      console.error('🟣❌ [TeamContext] Team NÃO ENCONTRADO:', teamId);
       toast({
         title: "Operação não encontrada",
         variant: "destructive",
@@ -158,8 +162,10 @@ export function TeamProvider({ children }: TeamProviderProps) {
       return;
     }
 
+    console.log('🟣✅ [TeamContext] Team encontrado:', team.team_name);
     setCurrentTeam(team);
     localStorage.setItem(CURRENT_TEAM_KEY, teamId);
+    console.log('🟣✅ [TeamContext] currentTeam atualizado e salvo no localStorage');
     
     toast({
       title: "Operação alterada",

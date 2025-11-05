@@ -131,9 +131,18 @@ export const AppSidebar = () => {
         <SidebarMenu>
           <SidebarMenuItem>
             <Button
-              onClick={async () => {
-                console.log('Logout clicked');
-                await signOut();
+              onClick={async (e) => {
+                console.log('🔵🔵🔵 [AppSidebar] BOTÃO SAIR CLICADO');
+                console.log('🔵 [AppSidebar] Event:', e);
+                console.log('🔵 [AppSidebar] signOut function:', typeof signOut);
+                
+                try {
+                  console.log('🔵 [AppSidebar] Chamando signOut()...');
+                  await signOut();
+                  console.log('🔵✅ [AppSidebar] signOut() completado');
+                } catch (error) {
+                  console.error('🔵❌ [AppSidebar] ERRO ao executar signOut:', error);
+                }
               }}
               variant="ghost"
               className="w-full justify-start"

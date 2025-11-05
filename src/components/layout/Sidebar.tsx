@@ -46,7 +46,19 @@ export const Sidebar = () => {
 
       <div className="p-4 border-t border-slate-200">
         <Button
-          onClick={signOut}
+          onClick={async (e) => {
+            console.log('🟢🟢🟢 [Sidebar] BOTÃO SAIR CLICADO');
+            console.log('🟢 [Sidebar] Event:', e);
+            console.log('🟢 [Sidebar] signOut function:', typeof signOut);
+            
+            try {
+              console.log('🟢 [Sidebar] Chamando signOut()...');
+              await signOut();
+              console.log('🟢✅ [Sidebar] signOut() completado');
+            } catch (error) {
+              console.error('🟢❌ [Sidebar] ERRO ao executar signOut:', error);
+            }
+          }}
           variant="ghost"
           className="w-full justify-start text-slate-600 hover:text-slate-800"
         >
