@@ -38,29 +38,38 @@ BEGIN
   IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'sellers2') THEN
     RAISE NOTICE '📦 Migrando sellers2 → sellers...';
     
-    INSERT INTO sellers (
-      id,
-      name,
-      weight,
-      team_id,
-      created_at,
-      updated_at
-    )
-    SELECT 
-      id,
-      name,
-      weight,
-      v_team_gustavo, -- Associar ao Gustavo
-      created_at,
-      updated_at
-    FROM sellers2
-    ON CONFLICT (id) DO UPDATE SET
-      team_id = v_team_gustavo,
-      name = EXCLUDED.name,
-      weight = EXCLUDED.weight;
-    
-    GET DIAGNOSTICS v_sellers_migrados = ROW_COUNT;
-    RAISE NOTICE '✅ Vendedores migrados: %', v_sellers_migrados;
+    -- Verificar quais colunas existem em sellers
+    DECLARE
+      v_has_updated_at BOOLEAN;
+    BEGIN
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_name = 'sellers' AND column_name = 'updated_at'
+      ) INTO v_has_updated_at;
+      
+      IF v_has_updated_at THEN
+        -- Inserir COM updated_at
+        INSERT INTO sellers (id, name, weight, team_id, created_at, updated_at)
+        SELECT id, name, weight, v_team_gustavo, created_at, updated_at
+        FROM sellers2
+        ON CONFLICT (id) DO UPDATE SET
+          team_id = v_team_gustavo,
+          name = EXCLUDED.name,
+          weight = EXCLUDED.weight;
+      ELSE
+        -- Inserir SEM updated_at
+        INSERT INTO sellers (id, name, weight, team_id, created_at)
+        SELECT id, name, weight, v_team_gustavo, created_at
+        FROM sellers2
+        ON CONFLICT (id) DO UPDATE SET
+          team_id = v_team_gustavo,
+          name = EXCLUDED.name,
+          weight = EXCLUDED.weight;
+      END IF;
+      
+      GET DIAGNOSTICS v_sellers_migrados = ROW_COUNT;
+      RAISE NOTICE '✅ Vendedores migrados: %', v_sellers_migrados;
+    END;
   ELSE
     RAISE NOTICE '⚠️  Tabela sellers2 não existe, pulando...';
   END IF;
@@ -74,28 +83,34 @@ BEGIN
   IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'seller_contacts2') THEN
     RAISE NOTICE '📦 Migrando seller_contacts2 → seller_contacts...';
     
-    INSERT INTO seller_contacts (
-      id,
-      seller_id,
-      phone_number,
-      description,
-      created_at,
-      updated_at
-    )
-    SELECT 
-      id,
-      seller_id,
-      phone_number,
-      description,
-      created_at,
-      updated_at
-    FROM seller_contacts2
-    ON CONFLICT (id) DO UPDATE SET
-      phone_number = EXCLUDED.phone_number,
-      description = EXCLUDED.description;
-    
-    GET DIAGNOSTICS v_contacts_migrados = ROW_COUNT;
-    RAISE NOTICE '✅ Contatos migrados: %', v_contacts_migrados;
+    -- Verificar estrutura de seller_contacts
+    DECLARE
+      v_has_updated_at BOOLEAN;
+    BEGIN
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_name = 'seller_contacts' AND column_name = 'updated_at'
+      ) INTO v_has_updated_at;
+      
+      IF v_has_updated_at THEN
+        INSERT INTO seller_contacts (id, seller_id, phone_number, description, created_at, updated_at)
+        SELECT id, seller_id, phone_number, description, created_at, updated_at
+        FROM seller_contacts2
+        ON CONFLICT (id) DO UPDATE SET
+          phone_number = EXCLUDED.phone_number,
+          description = EXCLUDED.description;
+      ELSE
+        INSERT INTO seller_contacts (id, seller_id, phone_number, description, created_at)
+        SELECT id, seller_id, phone_number, description, created_at
+        FROM seller_contacts2
+        ON CONFLICT (id) DO UPDATE SET
+          phone_number = EXCLUDED.phone_number,
+          description = EXCLUDED.description;
+      END IF;
+      
+      GET DIAGNOSTICS v_contacts_migrados = ROW_COUNT;
+      RAISE NOTICE '✅ Contatos migrados: %', v_contacts_migrados;
+    END;
   ELSE
     RAISE NOTICE '⚠️  Tabela seller_contacts2 não existe, pulando...';
   END IF;
@@ -109,37 +124,40 @@ BEGIN
   IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'campaigns2') THEN
     RAISE NOTICE '📦 Migrando campaigns2 → campaigns...';
     
-    INSERT INTO campaigns (
-      id,
-      name,
-      slug,
-      full_slug,
-      greeting_message,
-      is_active,
-      team_id,
-      created_at,
-      updated_at
-    )
-    SELECT 
-      id,
-      name,
-      slug,
-      'gustavo-de-castro-' || slug, -- Gerar full_slug
-      greeting_message,
-      is_active,
-      v_team_gustavo, -- Associar ao Gustavo
-      created_at,
-      updated_at
-    FROM campaigns2
-    ON CONFLICT (id) DO UPDATE SET
-      team_id = v_team_gustavo,
-      full_slug = 'gustavo-de-castro-' || EXCLUDED.slug,
-      name = EXCLUDED.name,
-      greeting_message = EXCLUDED.greeting_message,
-      is_active = EXCLUDED.is_active;
-    
-    GET DIAGNOSTICS v_campanhas_migradas = ROW_COUNT;
-    RAISE NOTICE '✅ Campanhas migradas: %', v_campanhas_migradas;
+    -- Verificar estrutura de campaigns
+    DECLARE
+      v_has_updated_at BOOLEAN;
+    BEGIN
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_name = 'campaigns' AND column_name = 'updated_at'
+      ) INTO v_has_updated_at;
+      
+      IF v_has_updated_at THEN
+        INSERT INTO campaigns (id, name, slug, full_slug, greeting_message, is_active, team_id, created_at, updated_at)
+        SELECT id, name, slug, 'gustavo-de-castro-' || slug, greeting_message, is_active, v_team_gustavo, created_at, updated_at
+        FROM campaigns2
+        ON CONFLICT (id) DO UPDATE SET
+          team_id = v_team_gustavo,
+          full_slug = 'gustavo-de-castro-' || EXCLUDED.slug,
+          name = EXCLUDED.name,
+          greeting_message = EXCLUDED.greeting_message,
+          is_active = EXCLUDED.is_active;
+      ELSE
+        INSERT INTO campaigns (id, name, slug, full_slug, greeting_message, is_active, team_id, created_at)
+        SELECT id, name, slug, 'gustavo-de-castro-' || slug, greeting_message, is_active, v_team_gustavo, created_at
+        FROM campaigns2
+        ON CONFLICT (id) DO UPDATE SET
+          team_id = v_team_gustavo,
+          full_slug = 'gustavo-de-castro-' || EXCLUDED.slug,
+          name = EXCLUDED.name,
+          greeting_message = EXCLUDED.greeting_message,
+          is_active = EXCLUDED.is_active;
+      END IF;
+      
+      GET DIAGNOSTICS v_campanhas_migradas = ROW_COUNT;
+      RAISE NOTICE '✅ Campanhas migradas: %', v_campanhas_migradas;
+    END;
   ELSE
     RAISE NOTICE '⚠️  Tabela campaigns2 não existe, pulando...';
   END IF;
