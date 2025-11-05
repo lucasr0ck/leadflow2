@@ -142,7 +142,8 @@ export function TeamProvider({ children }: TeamProviderProps) {
       console.log('TeamContext: Auth mudou ->', event);
       
       if (event === 'SIGNED_IN') {
-        loadUserTeams();
+        // Pequeno delay para garantir que o user está disponível
+        setTimeout(() => loadUserTeams(), 100);
       } else if (event === 'SIGNED_OUT') {
         setCurrentTeam(null);
         setAvailableTeams([]);
@@ -155,7 +156,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
       console.log('TeamContext: Limpando subscription');
       subscription.unsubscribe();
     };
-  }, [loadUserTeams]);
+  }, []); // Array vazio - só executa uma vez
 
   const value: TeamContextType = {
     currentTeam,
