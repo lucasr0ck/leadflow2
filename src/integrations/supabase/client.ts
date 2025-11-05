@@ -6,16 +6,21 @@ import type { Database } from './types';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// 🔥 CRITICAL DEBUG: Log what we're working with
+console.log('[Supabase Client] Initializing with:');
+console.log('[Supabase Client] URL:', supabaseUrl);
+console.log('[Supabase Client] Key (first 20 chars):', supabaseAnonKey?.substring(0, 20) + '...');
+
 // Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
   const missingVars = [];
   if (!supabaseUrl) missingVars.push('VITE_SUPABASE_URL');
   if (!supabaseAnonKey) missingVars.push('VITE_SUPABASE_ANON_KEY');
   
-  throw new Error(
-    `Missing required environment variables: ${missingVars.join(', ')}. ` +
-    'Please check your .env file or server environment variables configuration.'
-  );
+  const errorMsg = `Missing required environment variables: ${missingVars.join(', ')}. ` +
+    'Please check your .env file or server environment variables configuration.';
+  console.error('[Supabase Client] ERROR:', errorMsg);
+  throw new Error(errorMsg);
 }
 
 // Validate URL format
@@ -33,5 +38,12 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'leadflow2-frontend',
+    },
+  },
 });
+
+console.log('[Supabase Client] ✅ Client created successfully');

@@ -2,12 +2,17 @@ import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 
-// Add debugging for environment variables
-console.log('Environment check:', {
-  VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL ? 'Set' : 'Missing',
-  VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Set' : 'Missing',
-  NODE_ENV: import.meta.env.MODE,
-});
+// 🔥 CRITICAL DEBUG: Full environment variables check
+console.log('=================================================');
+console.log('🔍 ENVIRONMENT VARIABLES CHECK');
+console.log('=================================================');
+console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
+console.log('VITE_SUPABASE_ANON_KEY (first 50 chars):', import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 50) + '...');
+console.log('MODE:', import.meta.env.MODE);
+console.log('DEV:', import.meta.env.DEV);
+console.log('PROD:', import.meta.env.PROD);
+console.log('BASE_URL:', import.meta.env.BASE_URL);
+console.log('=================================================');
 
 // Wrap the render in a try-catch to catch any initialization errors
 try {

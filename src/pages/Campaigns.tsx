@@ -100,14 +100,27 @@ export const Campaigns = () => {
         throw new Error('Team ID is required');
       }
 
+      console.log('[Campaigns] 🔍 Fetching sellers for team_id:', currentTeam.team_id);
+      console.log('[Campaigns] 🔍 Supabase client:', supabase ? 'OK' : 'MISSING');
+      
+      // @ts-ignore - TypeScript issue with deep Supabase types
       const { data: sellersData, error: sellersError } = await supabase
         .from('sellers')
         .select('name, weight')
         .eq('team_id', currentTeam.team_id)
         .eq('is_active', true);
 
+      console.log('[Campaigns] 🔍 Sellers query result:');
+      console.log('[Campaigns] - Data:', sellersData);
+      console.log('[Campaigns] - Error:', sellersError);
+
       if (sellersError) {
-        console.error('[Campaigns] Error fetching sellers:', sellersError);
+        console.error('[Campaigns] ❌ Error fetching sellers:', {
+          code: sellersError.code,
+          message: sellersError.message,
+          details: sellersError.details,
+          hint: sellersError.hint,
+        });
         // Don't throw - continue with empty sellers array
       }
 
