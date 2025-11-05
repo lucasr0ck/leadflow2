@@ -72,26 +72,37 @@ export function TeamProvider({ children }: TeamProviderProps) {
       setLoading(true);
 
       try {
-        console.log('[TeamContext] 🔍 Calling supabase.rpc(get_user_teams)...');
+        console.log('[TeamContext] 🔍 Fetching teams with direct query...');
         
-        const { data, error } = await supabase.rpc('get_user_teams', {
-          user_id_param: user.id,
-        });
+        // 🔥 DIRECT QUERY: Bypass RPC function and query directly
+        const { data: teamMembersData, error: teamMembersError } = await supabase
+          .from('team_members')
+          .select(`
+            team_id,
+            role,
+            teams:team_id (
+              id,
+              team_name,
+              owner_id,
+              created_at
+            )
+          `)
+          .eq('user_id', user.id);
 
-        console.log('[TeamContext] 🔍 RPC Response:');
-        console.log('[TeamContext] - Data:', data);
-        console.log('[TeamContext] - Error:', error);
+        console.log('[TeamContext] 🔍 Direct Query Response:');
+        console.log('[TeamContext] - Data:', teamMembersData);
+        console.log('[TeamContext] - Error:', teamMembersError);
 
-        if (error) {
-          console.error('[TeamContext] ❌ RPC Error:', {
-            code: error.code,
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
+        if (teamMembersError) {
+          console.error('[TeamContext] ❌ Query Error:', {
+            code: teamMembersError.code,
+            message: teamMembersError.message,
+            details: teamMembersError.details,
+            hint: teamMembersError.hint,
           });
           toastRef.current({
             title: "Erro ao carregar operações",
-            description: error.message,
+            description: teamMembersError.message,
             variant: "destructive",
           });
           setAvailableTeams([]);
@@ -100,10 +111,20 @@ export function TeamProvider({ children }: TeamProviderProps) {
           return;
         }
 
-        const teams = ((data || []) as UserTeam[]).map(team => ({
-          ...team,
-          member_count: normalizeMemberCount(team.member_count),
-        }));
+        // Transform data to UserTeam format
+        const teams = (teamMembersData || [])
+          .filter(tm => tm.teams) // Filter out null teams
+          .map(tm => {
+            const team = Array.isArray(tm.teams) ? tm.teams[0] : tm.teams;
+            return {
+              team_id: team.id,
+              team_name: team.team_name,
+              user_role: tm.role,
+              owner_id: team.owner_id,
+              member_count: 0, // We'll set this properly later if needed
+              created_at: team.created_at,
+            } as UserTeam;
+          });
 
         console.log('[TeamContext] Teams loaded:', teams.length);
         setAvailableTeams(teams);
