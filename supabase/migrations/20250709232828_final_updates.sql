@@ -2,11 +2,11 @@
 
 -- 1.1. Add weight column to sellers table
 ALTER TABLE public.sellers 
-ADD COLUMN weight integer NOT NULL DEFAULT 1;
+ADD COLUMN IF NOT EXISTS weight integer DEFAULT 1;
 
 -- 1.2. Add seller_id to clicks table to track which seller received each click
 ALTER TABLE public.clicks 
-ADD COLUMN seller_id uuid REFERENCES public.sellers(id);
+ADD COLUMN IF NOT EXISTS seller_id uuid REFERENCES public.sellers(id);
 
 -- 1.3. Drop the obsolete campaign_links table entirely
 DROP TABLE IF EXISTS public.campaign_links CASCADE;

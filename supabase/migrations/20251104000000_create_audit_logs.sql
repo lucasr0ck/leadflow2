@@ -63,12 +63,17 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create trigger for seller weight changes
-DROP TRIGGER IF EXISTS trigger_log_seller_weight_change ON sellers;
-CREATE TRIGGER trigger_log_seller_weight_change
-  AFTER UPDATE ON sellers
-  FOR EACH ROW
-  EXECUTE FUNCTION log_seller_weight_change();
+-- Create trigger for seller weight changes (only if table exists)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'sellers') THEN
+    DROP TRIGGER IF EXISTS trigger_log_seller_weight_change ON sellers;
+    CREATE TRIGGER trigger_log_seller_weight_change
+      AFTER UPDATE ON sellers
+      FOR EACH ROW
+      EXECUTE FUNCTION log_seller_weight_change();
+  END IF;
+END $$;
 
 -- Function to automatically log seller deletions
 CREATE OR REPLACE FUNCTION log_seller_deletion()
@@ -93,12 +98,17 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create trigger for seller deletions
-DROP TRIGGER IF EXISTS trigger_log_seller_deletion ON sellers;
-CREATE TRIGGER trigger_log_seller_deletion
-  BEFORE DELETE ON sellers
-  FOR EACH ROW
-  EXECUTE FUNCTION log_seller_deletion();
+-- Create trigger for seller deletions (only if table exists)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'sellers') THEN
+    DROP TRIGGER IF EXISTS trigger_log_seller_deletion ON sellers;
+    CREATE TRIGGER trigger_log_seller_deletion
+      BEFORE DELETE ON sellers
+      FOR EACH ROW
+      EXECUTE FUNCTION log_seller_deletion();
+  END IF;
+END $$;
 
 -- Function to automatically log campaign changes
 CREATE OR REPLACE FUNCTION log_campaign_changes()
@@ -143,12 +153,17 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create trigger for campaign changes
-DROP TRIGGER IF EXISTS trigger_log_campaign_changes ON campaigns;
-CREATE TRIGGER trigger_log_campaign_changes
-  AFTER INSERT OR UPDATE ON campaigns
-  FOR EACH ROW
-  EXECUTE FUNCTION log_campaign_changes();
+-- Create trigger for campaign changes (only if table exists)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'campaigns') THEN
+    DROP TRIGGER IF EXISTS trigger_log_campaign_changes ON campaigns;
+    CREATE TRIGGER trigger_log_campaign_changes
+      AFTER INSERT OR UPDATE ON campaigns
+      FOR EACH ROW
+      EXECUTE FUNCTION log_campaign_changes();
+  END IF;
+END $$;
 
 -- Function to automatically log campaign deletions
 CREATE OR REPLACE FUNCTION log_campaign_deletion()
@@ -173,9 +188,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create trigger for campaign deletions
-DROP TRIGGER IF EXISTS trigger_log_campaign_deletion ON campaigns;
-CREATE TRIGGER trigger_log_campaign_deletion
-  BEFORE DELETE ON campaigns
-  FOR EACH ROW
-  EXECUTE FUNCTION log_campaign_deletion();
+-- Create trigger for campaign deletions (only if table exists)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'campaigns') THEN
+    DROP TRIGGER IF EXISTS trigger_log_campaign_deletion ON campaigns;
+    CREATE TRIGGER trigger_log_campaign_deletion
+      BEFORE DELETE ON campaigns
+      FOR EACH ROW
+      EXECUTE FUNCTION log_campaign_deletion();
+  END IF;
+END $$;

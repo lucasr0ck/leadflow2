@@ -105,10 +105,13 @@ export const Campaigns = () => {
             .gte('created_at', sevenDaysAgo.toISOString());
 
           // Get sellers for this team with their weights (dynamic distribution)
+          // Note: In the new architecture, ALL active sellers from the team participate in ALL campaigns
+          // The distribution is based on weight, not pre-assigned links
           const { data: sellersData } = await supabase
             .from('sellers')
             .select('name, weight')
-            .eq('team_id', currentTeam.team_id);
+            .eq('team_id', currentTeam.team_id)
+            .eq('is_active', true);
 
           const sellers = sellersData?.map(seller => ({
             name: seller.name,

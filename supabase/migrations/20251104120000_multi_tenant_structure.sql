@@ -276,26 +276,9 @@ USING (
 -- 11. ATUALIZAR RLS POLICIES - AUDIT_LOGS (se existir)
 -- =====================================================
 
--- Verificar se tabela existe e criar policy
-DO $$ 
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'audit_logs') THEN
-    -- Remover policy antiga se existir
-    DROP POLICY IF EXISTS "Users can view audit_logs from their team" ON audit_logs;
-    
-    -- Nova policy: Usuários veem audit logs de teams que são membros
-    EXECUTE 'CREATE POLICY "Users can view audit_logs from teams they belong to"
-    ON audit_logs
-    FOR SELECT
-    USING (
-      team_id IN (
-        SELECT team_id 
-        FROM team_members 
-        WHERE user_id = auth.uid()
-      )
-    )';
-  END IF;
-END $$;
+-- Note: audit_logs table doesn't have team_id column, 
+-- so we skip the multi-tenant policy for now
+-- Users can already only see their own audit logs via the user_id column
 
 -- =====================================================
 -- 12. FUNÇÃO AUXILIAR - VERIFICAR SE USUÁRIO É MEMBRO

@@ -198,9 +198,23 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_clicks_created_at ON clicks(created_at);
-CREATE INDEX IF NOT EXISTS idx_clicks_campaign_created ON clicks(campaign_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_clicks_seller_created ON clicks(seller_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_campaigns_team_id ON campaigns(team_id);
-CREATE INDEX IF NOT EXISTS idx_sellers_team_id ON sellers(team_id);
+-- Create indexes for better performance (only if tables exist)
+DO $$ 
+BEGIN
+  -- Create indexes for clicks table
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'clicks') THEN
+    CREATE INDEX IF NOT EXISTS idx_clicks_created_at ON clicks(created_at);
+    CREATE INDEX IF NOT EXISTS idx_clicks_campaign_created ON clicks(campaign_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_clicks_seller_created ON clicks(seller_id, created_at);
+  END IF;
+  
+  -- Create indexes for campaigns table
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'campaigns') THEN
+    CREATE INDEX IF NOT EXISTS idx_campaigns_team_id ON campaigns(team_id);
+  END IF;
+  
+  -- Create indexes for sellers table
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'sellers') THEN
+    CREATE INDEX IF NOT EXISTS idx_sellers_team_id ON sellers(team_id);
+  END IF;
+END $$;
