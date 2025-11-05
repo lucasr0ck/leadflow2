@@ -189,9 +189,19 @@ ON team_members(user_id, team_id);
 CREATE INDEX IF NOT EXISTS idx_clicks_team_campaign_date 
 ON clicks(team_id, campaign_id, created_at DESC);
 
--- Índice composto para lookup de seller_contacts
-CREATE INDEX IF NOT EXISTS idx_seller_contacts_seller_campaign 
-ON seller_contacts(seller_id, campaign_id);
+-- Índice composto para lookup de seller_contacts (apenas se coluna campaign_id existir)
+DO $$ 
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'seller_contacts' 
+    AND column_name = 'campaign_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_seller_contacts_seller_campaign 
+    ON seller_contacts(seller_id, campaign_id);
+  END IF;
+END $$;
 
 -- =====================================================
 -- 7. VALIDAÇÃO DE INTEGRIDADE DE DADOS
@@ -223,22 +233,36 @@ BEGIN
   END IF;
 END $$;
 
--- Verificar seller_contacts com team_id incompatível
+-- Verificar seller_contacts com team_id incompatível (apenas se campaign_id existir e não for NULL)
 DO $$ 
 DECLARE
   mismatched_contacts INTEGER;
+  campaign_id_exists BOOLEAN;
 BEGIN
-  SELECT COUNT(*) INTO mismatched_contacts
-  FROM seller_contacts sc
-  INNER JOIN sellers s ON sc.seller_id = s.id
-  INNER JOIN campaigns c ON sc.campaign_id = c.id
-  WHERE s.team_id != c.team_id;
+  -- Verificar se coluna campaign_id existe
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'seller_contacts' 
+    AND column_name = 'campaign_id'
+  ) INTO campaign_id_exists;
   
-  IF mismatched_contacts > 0 THEN
-    RAISE WARNING '⚠️ AVISO: % seller_contacts encontrados com team_id incompatível!', mismatched_contacts;
-    RAISE NOTICE 'Execute manualmente: SELECT * FROM seller_contacts sc INNER JOIN sellers s ON sc.seller_id = s.id INNER JOIN campaigns c ON sc.campaign_id = c.id WHERE s.team_id != c.team_id;';
+  IF campaign_id_exists THEN
+    SELECT COUNT(*) INTO mismatched_contacts
+    FROM seller_contacts sc
+    INNER JOIN sellers s ON sc.seller_id = s.id
+    INNER JOIN campaigns c ON sc.campaign_id = c.id
+    WHERE s.team_id != c.team_id
+    AND sc.campaign_id IS NOT NULL;
+    
+    IF mismatched_contacts > 0 THEN
+      RAISE WARNING '⚠️ AVISO: % seller_contacts encontrados com team_id incompatível!', mismatched_contacts;
+      RAISE NOTICE 'Execute manualmente: SELECT * FROM seller_contacts sc INNER JOIN sellers s ON sc.seller_id = s.id INNER JOIN campaigns c ON sc.campaign_id = c.id WHERE s.team_id != c.team_id AND sc.campaign_id IS NOT NULL;';
+    ELSE
+      RAISE NOTICE '✅ Nenhum seller_contact com team_id incompatível';
+    END IF;
   ELSE
-    RAISE NOTICE '✅ Nenhum seller_contact com team_id incompatível';
+    RAISE NOTICE '✅ Coluna campaign_id não existe em seller_contacts (arquitetura dinâmica)';
   END IF;
 END $$;
 
