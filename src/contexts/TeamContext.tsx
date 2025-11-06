@@ -628,6 +628,8 @@ export function TeamProvider({ children }: TeamProviderProps) {
       reason: 'cache-hydration',
     });
 
+    setLoading(false);
+
     return true;
   }, [user, applyTeams]);
 
@@ -723,6 +725,10 @@ export function TeamProvider({ children }: TeamProviderProps) {
     if (!hasHydratedFromCacheRef.current) {
       hydrated = hydrateFromCache();
       hasHydratedFromCacheRef.current = true;
+    }
+
+    if (hydrated) {
+      setLoading(false);
     }
 
     loadTeams({
