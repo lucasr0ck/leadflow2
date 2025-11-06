@@ -13,6 +13,7 @@ import { EditSellerDialog } from '@/components/EditSellerDialog';
 import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuditLog } from '@/hooks/useAuditLog';
+import { ensureSupabaseSession } from '@/utils/supabaseSession';
 
 interface Seller {
   id: string;
@@ -71,6 +72,8 @@ export const Sellers = () => {
 
     try {
       setLoading(true);
+
+      await ensureSupabaseSession();
 
       // Fetch sellers with their contacts using currentTeam
       const { data: sellersData } = await supabase
