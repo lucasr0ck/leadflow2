@@ -9,6 +9,11 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+console.log('[Supabase Client] 🔍 ENV VARS CHECK:');
+console.log('[Supabase Client] - VITE_SUPABASE_URL:', supabaseUrl ? 'DEFINED' : 'UNDEFINED');
+console.log('[Supabase Client] - VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? `DEFINED (${supabaseAnonKey.substring(0, 20)}...)` : 'UNDEFINED');
+console.log('[Supabase Client] - VITE_SUPABASE_SERVICE_ROLE_KEY:', supabaseServiceRoleKey ? `DEFINED (${supabaseServiceRoleKey.substring(0, 20)}...)` : 'UNDEFINED');
+
 // Use service_role if available, otherwise fallback to anon
 const supabaseKey = supabaseServiceRoleKey || supabaseAnonKey;
 
