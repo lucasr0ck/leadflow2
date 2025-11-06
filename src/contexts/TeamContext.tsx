@@ -81,7 +81,22 @@ export function TeamProvider({ children }: TeamProviderProps) {
           .select('id, team_name, owner_id, created_at')
           .eq('owner_id', user.id);
 
-        console.log('[TeamContext] 🔍 Owned teams result:', { data: ownedTeams, error: ownedError });
+        console.log('[TeamContext] 🔍 Owned teams result:', { 
+          data: ownedTeams, 
+          error: ownedError,
+          dataLength: ownedTeams?.length,
+          dataIsArray: Array.isArray(ownedTeams),
+          dataType: typeof ownedTeams
+        });
+
+        if (ownedError) {
+          console.error('[TeamContext] ❌ Error fetching owned teams:', ownedError);
+          toastRef.current({
+            title: "Erro ao carregar operações",
+            description: ownedError.message,
+            variant: "destructive",
+          });
+        }
 
         if (ownedTeams && ownedTeams.length > 0) {
           // User owns teams! Use them directly
@@ -180,9 +195,14 @@ export function TeamProvider({ children }: TeamProviderProps) {
         setAvailableTeams(teams);
 
         if (teams.length === 0) {
-          console.log('[TeamContext] No teams found');
+          console.log('[TeamContext] ⚠️ No teams found for user');
           setCurrentTeam(null);
           setLoading(false);
+          toastRef.current({
+            title: "Nenhuma operação encontrada",
+            description: "Você precisa criar uma operação em Configurações → Gerenciar Operações",
+            variant: "default",
+          });
           return;
         }
 
