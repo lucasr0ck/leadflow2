@@ -73,34 +73,17 @@ export function TeamProvider({ children }: TeamProviderProps) {
 
       try {
         console.log('[TeamContext] 🔍 Fetching teams with direct query...');
-        
+
         // 🔥 STRATEGY 1: Try to get teams where user is owner (most common case)
         console.log('[TeamContext] 🔍 Trying teams where user is owner...');
-        
-        // 🚨 CRITICAL FIX: Add aggressive timeout because query hangs
-        const teamsQueryPromise = supabase
+
+        const { data: ownedTeams, error: ownedError } = await supabase
           .from('teams')
           .select('id, team_name, owner_id, created_at')
           .eq('owner_id', user.id);
-        
-        const timeout = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Teams query timeout after 3 seconds')), 3000)
-        );
-        
-        let ownedTeams = null;
-        let ownedError = null;
-        
-        try {
-          const result = await Promise.race([teamsQueryPromise, timeout]);
-          ownedTeams = result.data;
-          ownedError = result.error;
-        } catch (err) {
-          console.error('[TeamContext] ⏱️ Query timeout or error:', err);
-          ownedError = err as any;
-        }
 
-        console.log('[TeamContext] 🔍 Owned teams result:', { 
-          data: ownedTeams, 
+        console.log('[TeamContext] 🔍 Owned teams result:', {
+          data: ownedTeams,
           error: ownedError,
           dataLength: ownedTeams?.length,
           dataIsArray: Array.isArray(ownedTeams),
@@ -147,7 +130,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
 
         // 🔥 STRATEGY 2: Try team_members with timeout (if user is not owner)
         console.log('[TeamContext] 🔍 No owned teams, trying team_members...');
-        const queryPromise = supabase
+        const { data: teamMembersData, error: teamMembersError } = await supabase
           .from('team_members')
           .select(`
             team_id,
@@ -160,15 +143,6 @@ export function TeamProvider({ children }: TeamProviderProps) {
             )
           `)
           .eq('user_id', user.id);
-
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Query timeout after 5 seconds')), 5000);
-        });
-
-        const { data: teamMembersData, error: teamMembersError } = await Promise.race([
-          queryPromise,
-          timeoutPromise
-        ]) as any;
 
         console.log('[TeamContext] 🔍 Direct Query Response:');
         console.log('[TeamContext] - Data:', teamMembersData);
