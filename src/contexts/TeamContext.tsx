@@ -76,10 +76,28 @@ export function TeamProvider({ children }: TeamProviderProps) {
         
         // 🔥 STRATEGY 1: Try to get teams where user is owner (most common case)
         console.log('[TeamContext] 🔍 Trying teams where user is owner...');
-        const { data: ownedTeams, error: ownedError } = await supabase
+        
+        // 🚨 CRITICAL FIX: Add aggressive timeout because query hangs
+        const teamsQueryPromise = supabase
           .from('teams')
           .select('id, team_name, owner_id, created_at')
           .eq('owner_id', user.id);
+        
+        const timeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Teams query timeout after 3 seconds')), 3000)
+        );
+        
+        let ownedTeams = null;
+        let ownedError = null;
+        
+        try {
+          const result = await Promise.race([teamsQueryPromise, timeout]);
+          ownedTeams = result.data;
+          ownedError = result.error;
+        } catch (err) {
+          console.error('[TeamContext] ⏱️ Query timeout or error:', err);
+          ownedError = err as any;
+        }
 
         console.log('[TeamContext] 🔍 Owned teams result:', { 
           data: ownedTeams, 
