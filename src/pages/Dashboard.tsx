@@ -8,6 +8,7 @@ import { format, subDays, startOfDay, addDays } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ensureSupabaseSession } from '@/utils/supabaseSession';
+import { useAppReadiness } from '@/hooks/useAppReadiness';
 
 interface DashboardStats {
   activeSellers: number;
@@ -23,6 +24,9 @@ interface ChartData {
 export const Dashboard = () => {
   const { user } = useAuth();
   const { currentTeam, loading: teamLoading, availableTeams } = useTeam();
+  const readiness = useAppReadiness();
+  // Evitar problemas de inferência profunda do supabase types durante selects simples de contagem
+  const sb: any = supabase as any;
   const [stats, setStats] = useState<DashboardStats>({
     activeSellers: 0,
     activeCampaigns: 0,
@@ -37,11 +41,13 @@ export const Dashboard = () => {
       hasTeam: !!currentTeam, 
       teamLoading,
       teamId: currentTeam?.team_id,
-      teamName: currentTeam?.team_name 
+      teamName: currentTeam?.team_name,
+      appReady: readiness.ready,
+      reason: readiness.reason,
     });
     
     // ⚠️ CRITICAL FIX: Não renderizar se ainda está carregando teams
-    if (teamLoading) {
+    if (!readiness.ready) {
       console.log('[Dashboard] Aguardando teams carregarem...');
       return;
     }
@@ -52,7 +58,7 @@ export const Dashboard = () => {
     } else {
       console.log('[Dashboard] Não vai buscar dados:', { hasUser: !!user, hasTeam: !!currentTeam });
     }
-  }, [user, currentTeam?.team_id, teamLoading]); // Dependência específica no team_id
+  }, [user, currentTeam?.team_id, teamLoading, readiness.ready]); // Dependência específica no team_id
 
   const fetchDashboardData = async () => {
     if (!currentTeam) return;
@@ -62,26 +68,34 @@ export const Dashboard = () => {
       await ensureSupabaseSession();
 
       // Contagens mais performáticas usando head + count
-      const [sellersRes, campaignsRes, clicksTodayRes] = await Promise.all([
-        supabase
-          .from('sellers')
-          .select('*', { count: 'exact', head: true })
-          .eq('team_id', currentTeam.team_id),
-        supabase
-          .from('campaigns')
-          .select('*', { count: 'exact', head: true })
-          .eq('team_id', currentTeam.team_id),
-        supabase
-          .from('clicks')
-          .select('*', { count: 'exact', head: true })
-          .eq('team_id', currentTeam.team_id)
-          .gte('created_at', startOfDay(new Date()).toISOString())
-      ]);
+      // Usa colunas mínimas para reduzir inferência profunda de tipos do supabase-js
+      // Workaround para limite de profundidade de tipos: fazer as contagens sequencialmente
+      const sellersRes = await sb
+        .from('sellers')
+        .select('id', { count: 'exact', head: true })
+        .eq('team_id', currentTeam.team_id);
+
+      const campaignsRes = await sb
+        .from('campaigns')
+        .select('id', { count: 'exact', head: true })
+        .eq('team_id', currentTeam.team_id);
+
+      const clicksTodayRes = await sb
+        .from('clicks')
+        .select('id', { count: 'exact', head: true })
+        .eq('team_id', currentTeam.team_id)
+        .gte('created_at', startOfDay(new Date()).toISOString());
 
       setStats({
         activeSellers: sellersRes.count || 0,
         activeCampaigns: campaignsRes.count || 0,
         totalClicksToday: clicksTodayRes.count || 0,
+      });
+
+      console.log('[Dashboard] Counters:', {
+        sellers: sellersRes.count,
+        campaigns: campaignsRes.count,
+        clicksToday: clicksTodayRes.count,
       });
 
       // Série últimos 30 dias (client-side aggregation simples)
@@ -90,7 +104,7 @@ export const Dashboard = () => {
         const dayStart = subDays(startOfDay(new Date()), i);
         const dayEnd = addDays(dayStart, 1);
         const p: Promise<ChartData> = (async () => {
-          const res = await supabase
+          const res = await sb
             .from('clicks')
             .select('id', { count: 'exact', head: true })
             .eq('team_id', currentTeam.team_id)
@@ -104,7 +118,7 @@ export const Dashboard = () => {
         chartPromises.push(p);
       }
       const chartResults = await Promise.all(chartPromises);
-      setChartData(chartResults);
+  setChartData(chartResults);
 
       // Campanhas recentes com contagem de clicks (usar relacionamento se definido ou fallback a segunda query)
       const { data: campaigns, error: campaignsError } = await supabase
@@ -119,18 +133,30 @@ export const Dashboard = () => {
       }
 
       // Para cada campanha, contar clicks (pode virar RPC/EMBED depois)
-      const enriched = await Promise.all(
-        (campaigns || []).map(async (c) => {
-          const { count } = await supabase
-            .from('clicks')
-            .select('id', { count: 'exact', head: true })
-            .eq('team_id', currentTeam.team_id)
-            .eq('campaign_id', c.id);
-          return { ...c, clicks: [{ count: count || 0 }] };
-        })
-      );
+        const enriched = await Promise.all(
+          (campaigns || []).map(async (c) => {
+            const res: any = await sb
+              .from('clicks')
+              .select('id', { count: 'exact', head: true })
+              .eq('team_id', currentTeam.team_id)
+              .eq('campaign_id', c.id);
+            return { ...c, clicks: [{ count: res.count || 0 }] };
+          })
+        );
 
       setRecentCampaigns(enriched);
+
+      // Re-fetch defensivo: se tudo 0 mas há time selecionado, tentar novamente em 1s
+      const zeroed = (sellersRes.count ?? 0) === 0 && (campaignsRes.count ?? 0) === 0 && (clicksTodayRes.count ?? 0) === 0;
+      if (zeroed) {
+        console.log('[Dashboard] Zeroed metrics detected, scheduling defensive re-fetch...');
+        setTimeout(() => {
+          // evite recaptura se time mudou
+          if (currentTeam?.team_id) {
+            void fetchDashboardData();
+          }
+        }, 1000);
+      }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     }
