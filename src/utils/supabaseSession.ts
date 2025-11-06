@@ -1,9 +1,9 @@
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-const WAIT_FOR_SESSION_TIMEOUT_MS = 2000;
-const POLL_INTERVAL_MS = 200;
+// Give the auth system enough time to hydrate from storage after hard reloads
 const WAIT_FOR_SESSION_TIMEOUT_MS = 5000;
+const POLL_INTERVAL_MS = 200;
 let pendingSessionPromise: Promise<Session | null> | null = null;
 
 /**
@@ -25,13 +25,6 @@ export async function ensureSupabaseSession(): Promise<Session | null> {
       let pollId: ReturnType<typeof setInterval> | undefined;
       let activeSubscription: { unsubscribe: () => void } | null = null;
       let polling = false;
-
-      const finish = (session: Session | null) => {
-        if (settled) {
-          return;
-        }
-
-      let activeSubscription: { unsubscribe: () => void } | null = null;
 
       const finish = (session: Session | null) => {
         if (settled) return;
