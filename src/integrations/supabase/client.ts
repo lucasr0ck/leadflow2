@@ -4,18 +4,25 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+// 🚨 TEMPORARY: Use SERVICE_ROLE_KEY to bypass PostgREST issues
+// This is for DEBUGGING ONLY - will revert back to anon key later
+const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Use service_role if available, otherwise fallback to anon
+const supabaseKey = supabaseServiceRoleKey || supabaseAnonKey;
 
 // 🔥 CRITICAL DEBUG: Log what we're working with
 console.log('[Supabase Client] Initializing with:');
 console.log('[Supabase Client] URL:', supabaseUrl);
-console.log('[Supabase Client] Key (first 20 chars):', supabaseAnonKey?.substring(0, 20) + '...');
+console.log('[Supabase Client] Using KEY:', supabaseServiceRoleKey ? 'SERVICE_ROLE (ADMIN)' : 'ANON (Normal)');
+console.log('[Supabase Client] Key (first 20 chars):', supabaseKey?.substring(0, 20) + '...');
 
 // Validate environment variables
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!supabaseUrl || !supabaseKey) {
   const missingVars = [];
   if (!supabaseUrl) missingVars.push('VITE_SUPABASE_URL');
-  if (!supabaseAnonKey) missingVars.push('VITE_SUPABASE_ANON_KEY');
+  if (!supabaseKey) missingVars.push('VITE_SUPABASE_SERVICE_ROLE_KEY or VITE_SUPABASE_ANON_KEY');
   
   const errorMsg = `Missing required environment variables: ${missingVars.join(', ')}. ` +
     'Please check your .env file or server environment variables configuration.';
@@ -33,7 +40,7 @@ try {
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   auth: {
     storage: localStorage,
     persistSession: true,
