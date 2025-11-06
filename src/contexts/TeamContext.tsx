@@ -9,6 +9,7 @@ import React, {
   useRef,
 } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { ensureSupabaseSession } from '@/utils/supabaseSession';
 import { UserTeam } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -651,6 +652,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
     }
 
     try {
+      await ensureSupabaseSession();
       const result = await fetchTeamsData(user.id);
 
       if (result.teams.length === 0) {

@@ -7,6 +7,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { format, subDays, startOfDay } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ensureSupabaseSession } from '@/utils/supabaseSession';
 
 interface DashboardStats {
   activeSellers: number;
@@ -55,8 +56,9 @@ export const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     if (!currentTeam) return;
-    
+
     try {
+      await ensureSupabaseSession();
 
       // Fetch stats
       const [sellersRes, campaignsRes, clicksRes] = await Promise.all([

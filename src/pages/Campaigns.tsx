@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { subDays, startOfDay } from 'date-fns';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ensureSupabaseSession } from '@/utils/supabaseSession';
 
 interface Campaign {
   id: string;
@@ -66,6 +67,8 @@ export const Campaigns = () => {
     try {
       console.log('[Campaigns] fetchCampaigns: Starting fetch for team:', currentTeam.team_id);
       setLoading(true);
+
+      await ensureSupabaseSession();
 
       // Fetch campaigns with basic data - seller distribution is now dynamic
       const { data: campaignsData, error: campaignsError } = await supabase
