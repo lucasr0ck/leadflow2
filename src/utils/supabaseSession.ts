@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 const WAIT_FOR_SESSION_TIMEOUT_MS = 2000;
 const POLL_INTERVAL_MS = 200;
+const WAIT_FOR_SESSION_TIMEOUT_MS = 5000;
 let pendingSessionPromise: Promise<Session | null> | null = null;
 
 /**
@@ -30,6 +31,10 @@ export async function ensureSupabaseSession(): Promise<Session | null> {
           return;
         }
 
+      let activeSubscription: { unsubscribe: () => void } | null = null;
+
+      const finish = (session: Session | null) => {
+        if (settled) return;
         settled = true;
         if (timeoutId) {
           clearTimeout(timeoutId);
