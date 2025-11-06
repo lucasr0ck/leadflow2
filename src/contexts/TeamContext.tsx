@@ -74,7 +74,46 @@ export function TeamProvider({ children }: TeamProviderProps) {
       try {
         console.log('[TeamContext] 🔍 Fetching teams with direct query...');
         
-        // 🔥 TIMEOUT: If query takes more than 5 seconds, abort
+        // 🔥 STRATEGY 1: Try to get teams where user is owner (most common case)
+        console.log('[TeamContext] 🔍 Trying teams where user is owner...');
+        const { data: ownedTeams, error: ownedError } = await supabase
+          .from('teams')
+          .select('id, team_name, owner_id, created_at')
+          .eq('owner_id', user.id);
+
+        console.log('[TeamContext] 🔍 Owned teams result:', { data: ownedTeams, error: ownedError });
+
+        if (ownedTeams && ownedTeams.length > 0) {
+          // User owns teams! Use them directly
+          console.log('[TeamContext] ✅ Found', ownedTeams.length, 'owned teams');
+          
+          const teams = ownedTeams.map(team => ({
+            team_id: team.id,
+            team_name: team.team_name,
+            team_slug: team.team_name?.toLowerCase().replace(/\s+/g, '-') || '',
+            description: null,
+            role: 'owner' as const,
+            is_active: true,
+            member_count: 0,
+            joined_at: team.created_at,
+          }));
+
+          console.log('[TeamContext] Teams loaded:', teams.length);
+          setAvailableTeams(teams);
+
+          const savedTeamId = localStorage.getItem(CURRENT_TEAM_KEY);
+          const savedTeam = savedTeamId ? teams.find(t => t.team_id === savedTeamId) : null;
+          const teamToSelect = savedTeam || teams[0];
+          
+          console.log('[TeamContext] Selected:', teamToSelect.team_name);
+          setCurrentTeam(teamToSelect);
+          localStorage.setItem(CURRENT_TEAM_KEY, teamToSelect.team_id);
+          setLoading(false);
+          return;
+        }
+
+        // 🔥 STRATEGY 2: Try team_members with timeout (if user is not owner)
+        console.log('[TeamContext] 🔍 No owned teams, trying team_members...');
         const queryPromise = supabase
           .from('team_members')
           .select(`
