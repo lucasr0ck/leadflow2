@@ -26,8 +26,11 @@ const TeamContext = createContext<TeamContextType | undefined>(undefined);
 const CURRENT_TEAM_KEY = 'leadflow_current_team_id';
 const TEAM_CACHE_KEY = 'leadflow_team_cache_v1';
 const TEAM_CACHE_TTL = 1000 * 60 * 60 * 24;
-const RPC_TIMEOUT_MS = 8000;
-const FALLBACK_TIMEOUT_MS = 6000;
+// Give Supabase more time to respond before considering the request as failed.
+// Some environments experience slow network responses that exceeded the previous
+// 6-8s window and triggered the fallback unnecessarily.
+const RPC_TIMEOUT_MS = 20000;
+const FALLBACK_TIMEOUT_MS = 15000;
 const MAX_RPC_ATTEMPTS = 2;
 
 interface TeamCacheEntry {
@@ -219,39 +222,34 @@ const getErrorMessage = (error: unknown) => {
 };
 
 const withTimeout = async <T,>(
-  promiseFactory: () => Promise<T>,
+  promiseFactory: (options: { signal: AbortSignal }) => Promise<T>,
   timeoutMs: number,
   context: string,
 ): Promise<WithTimeoutResult<T>> => {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  const timeoutError = new Error(`${context} timed out after ${timeoutMs}ms`);
-  timeoutError.name = 'TimeoutError';
-
-  const sourcePromise = promiseFactory();
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(timeoutError), timeoutMs);
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
 
   try {
-    const value = await Promise.race([sourcePromise, timeoutPromise]);
+    const value = await promiseFactory({ signal: controller.signal });
     return {
       success: true,
-      value: value as T,
+      value,
       timedOut: false,
     };
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    const timedOut = err.name === 'TimeoutError' || err.message.includes('timed out');
+    const lowerMessage = err.message.toLowerCase();
+    const isAbortError = err.name === 'AbortError' || lowerMessage.includes('aborted');
+    const containsTimeout = lowerMessage.includes('timed out') || lowerMessage.includes('timeout');
+    const timedOut = isAbortError || containsTimeout;
 
-    if (timedOut) {
-      sourcePromise
-        .then((lateValue) => {
-          console.warn(`[TeamContext] ${context} resolved after timeout, ignoring result`, lateValue);
-        })
-        .catch((lateError) => {
-          console.warn(`[TeamContext] ${context} failed after timeout`, lateError);
-        });
+    if (isAbortError) {
+      err.name = 'TimeoutError';
+      err.message = `${context} timed out after ${timeoutMs}ms`;
+    } else if (containsTimeout && err.name !== 'TimeoutError') {
+      err.name = 'TimeoutError';
     }
 
     return {
@@ -260,19 +258,18 @@ const withTimeout = async <T,>(
       timedOut,
     };
   } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
+    clearTimeout(timeoutId);
   }
 };
 
 const fetchOwnedTeams = async (userId: string): Promise<UserTeam[]> => {
   const result = await withTimeout(
-    () =>
+    ({ signal }) =>
       supabase
         .from('teams')
         .select('id, team_name, slug, description, is_active, created_at')
-        .eq('owner_id', userId),
+        .eq('owner_id', userId)
+        .abortSignal(signal),
     FALLBACK_TIMEOUT_MS,
     'fetchOwnedTeams',
   );
@@ -310,7 +307,7 @@ const fetchOwnedTeams = async (userId: string): Promise<UserTeam[]> => {
 
 const fetchMemberTeams = async (userId: string): Promise<UserTeam[]> => {
   const result = await withTimeout(
-    () =>
+    ({ signal }) =>
       supabase
         .from('team_members')
         .select(
@@ -328,7 +325,8 @@ const fetchMemberTeams = async (userId: string): Promise<UserTeam[]> => {
             )
           `,
         )
-        .eq('user_id', userId),
+        .eq('user_id', userId)
+        .abortSignal(signal),
     FALLBACK_TIMEOUT_MS,
     'fetchMemberTeams',
   );
@@ -439,7 +437,8 @@ const fetchTeamsData = async (userId: string): Promise<FetchTeamsResult> => {
 
   for (let attempt = 1; attempt <= MAX_RPC_ATTEMPTS; attempt += 1) {
     const rpcResult = await withTimeout(
-      () => supabase.rpc('get_user_teams', { user_id_param: userId }),
+      ({ signal }) =>
+        supabase.rpc('get_user_teams', { user_id_param: userId }, { signal }),
       RPC_TIMEOUT_MS,
       `get_user_teams (attempt ${attempt})`,
     );
