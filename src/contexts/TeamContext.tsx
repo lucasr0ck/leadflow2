@@ -74,8 +74,8 @@ export function TeamProvider({ children }: TeamProviderProps) {
       try {
         console.log('[TeamContext] 🔍 Fetching teams with direct query...');
         
-        // 🔥 DIRECT QUERY: Bypass RPC function and query directly
-        const { data: teamMembersData, error: teamMembersError } = await supabase
+        // 🔥 TIMEOUT: If query takes more than 5 seconds, abort
+        const queryPromise = supabase
           .from('team_members')
           .select(`
             team_id,
@@ -88,6 +88,15 @@ export function TeamProvider({ children }: TeamProviderProps) {
             )
           `)
           .eq('user_id', user.id);
+
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Query timeout after 5 seconds')), 5000);
+        });
+
+        const { data: teamMembersData, error: teamMembersError } = await Promise.race([
+          queryPromise,
+          timeoutPromise
+        ]) as any;
 
         console.log('[TeamContext] 🔍 Direct Query Response:');
         console.log('[TeamContext] - Data:', teamMembersData);
@@ -119,10 +128,12 @@ export function TeamProvider({ children }: TeamProviderProps) {
             return {
               team_id: team.id,
               team_name: team.team_name,
-              user_role: tm.role,
-              owner_id: team.owner_id,
-              member_count: 0, // We'll set this properly later if needed
-              created_at: team.created_at,
+              team_slug: team.team_name?.toLowerCase().replace(/\s+/g, '-') || '',
+              description: null,
+              role: tm.role,
+              is_active: true,
+              member_count: 0,
+              joined_at: team.created_at,
             } as UserTeam;
           });
 
