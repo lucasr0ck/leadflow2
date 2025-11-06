@@ -25,6 +25,8 @@ const TeamContext = createContext<TeamContextType | undefined>(undefined);
 
 const LEGACY_TEAM_KEY = 'leadflow_current_team_id';
 const TEAM_STORAGE_PREFIX = 'leadflow_current_team';
+const TEAM_CACHE_PREFIX = 'leadflow_team_cache';
+const TEAM_CACHE_TTL_MS = 1000 * 60 * 5; // 5 minutes
 
 const isBrowser = typeof window !== 'undefined';
 
@@ -60,6 +62,7 @@ const safeStorage = {
 };
 
 const getStorageKey = (userId: string) => `${TEAM_STORAGE_PREFIX}:${userId}`;
+const getCacheKey = (userId: string) => `${TEAM_CACHE_PREFIX}:${userId}`;
 
 const getStoredTeamId = (userId: string | null | undefined) => {
   if (!userId) {
@@ -83,6 +86,62 @@ const clearStoredTeamId = (userId: string | null | undefined) => {
   }
 
   safeStorage.remove(LEGACY_TEAM_KEY);
+};
+
+interface TeamCacheEntry {
+  version: 1;
+  updatedAt: number;
+  teams: UserTeam[];
+}
+
+const readTeamCache = (userId: string): TeamCacheEntry | null => {
+  const raw = safeStorage.get(getCacheKey(userId));
+
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as TeamCacheEntry | null;
+
+    if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.teams) || typeof parsed.updatedAt !== 'number') {
+      console.warn('[TeamContext] Ignoring malformed team cache entry');
+      safeStorage.remove(getCacheKey(userId));
+      return null;
+    }
+
+    const age = Date.now() - parsed.updatedAt;
+
+    if (age > TEAM_CACHE_TTL_MS) {
+      console.log('[TeamContext] Team cache expired, discarding');
+      safeStorage.remove(getCacheKey(userId));
+      return null;
+    }
+
+    return parsed;
+  } catch (error) {
+    console.warn('[TeamContext] Failed to parse team cache entry', error);
+    safeStorage.remove(getCacheKey(userId));
+    return null;
+  }
+};
+
+const writeTeamCache = (userId: string, teams: UserTeam[]) => {
+  try {
+    const payload: TeamCacheEntry = {
+      version: 1,
+      updatedAt: Date.now(),
+      teams,
+    };
+
+    safeStorage.set(getCacheKey(userId), JSON.stringify(payload));
+  } catch (error) {
+    console.warn('[TeamContext] Failed to persist team cache', error);
+  }
+};
+
+const clearTeamCache = (userId: string) => {
+  safeStorage.remove(getCacheKey(userId));
 };
 
 const slugify = (value: string) => {
@@ -380,14 +439,18 @@ export function TeamProvider({ children }: TeamProviderProps) {
   const requestIdRef = useRef(0);
   const emptyToastRef = useRef(false);
 
-  const loadTeams = useCallback(async () => {
+  const loadTeams = useCallback(async (options: { silent?: boolean } = {}) => {
+    const { silent = false } = options;
+
     if (!user) {
       return;
     }
 
     const requestId = ++requestIdRef.current;
     console.log('[TeamContext] Loading teams for:', user.email);
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
 
     try {
       const teams = await fetchTeamsForUser(user.id);
@@ -402,6 +465,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
         setAvailableTeams([]);
         setCurrentTeam(null);
         clearStoredTeamId(user.id);
+        clearTeamCache(user.id);
 
         if (!emptyToastRef.current) {
           toastRef.current({
@@ -424,6 +488,7 @@ export function TeamProvider({ children }: TeamProviderProps) {
 
       setCurrentTeam(selectedTeam);
       storeTeamId(user.id, selectedTeam.team_id);
+      writeTeamCache(user.id, teams);
 
       console.log('[TeamContext] ✅ Teams loaded:', {
         total: teams.length,
@@ -449,10 +514,47 @@ export function TeamProvider({ children }: TeamProviderProps) {
         variant: 'destructive',
       });
     } finally {
-      if (requestIdRef.current === requestId) {
+      if (requestIdRef.current === requestId && !silent) {
         setLoading(false);
       }
     }
+  }, [user]);
+
+  const hydrateFromCache = useCallback(() => {
+    if (!user) {
+      return false;
+    }
+
+    const cached = readTeamCache(user.id);
+
+    if (!cached || cached.teams.length === 0) {
+      return false;
+    }
+
+    const deduped = dedupeTeams(cached.teams);
+
+    if (deduped.length === 0) {
+      clearTeamCache(user.id);
+      return false;
+    }
+
+    const storedTeamId = getStoredTeamId(user.id);
+    const selectedTeam = storedTeamId
+      ? deduped.find((team) => team.team_id === storedTeamId) ?? deduped[0]
+      : deduped[0];
+
+    setAvailableTeams(deduped);
+    setCurrentTeam(selectedTeam);
+    setLoading(false);
+
+    const ageSeconds = Math.round((Date.now() - cached.updatedAt) / 1000);
+    console.log('[TeamContext] ♻️ Hydrated teams from cache:', {
+      total: deduped.length,
+      selected: selectedTeam.team_name,
+      ageSeconds,
+    });
+
+    return true;
   }, [user]);
 
   useEffect(() => {
@@ -476,8 +578,9 @@ export function TeamProvider({ children }: TeamProviderProps) {
     }
 
     emptyToastRef.current = false;
-    loadTeams();
-  }, [user, authLoading, loadTeams]);
+    const hydrated = hydrateFromCache();
+    loadTeams({ silent: hydrated });
+  }, [user, authLoading, loadTeams, hydrateFromCache]);
 
   const switchTeam = useCallback((teamId: string) => {
     const team = availableTeams.find((t) => t.team_id === teamId);
