@@ -1,240 +1,44 @@
-# 🚨 CORREÇÕES APLICADAS - BUGS DO DROPDOWN E BOTÃO SAIR
-
-## ❌ **PROBLEMAS IDENTIFICADOS:**
-
-1. **Dropdown de operações some ao navegar** 
-   - Causa: Re-render sem `key` adequada
-   - Causa: `SelectValue` sem fallback explícito
-
-2. **Botão Sair não funciona**
-   - Causa: `SidebarMenuButton asChild` interferindo com `onClick`
-   - Solução: Remover `asChild` e usar Button diretamente
-
-3. **Dados desorganizados**
-   - Campanhas em "Multium Cursos" (operação antiga)
-   - Vendedores em "Caio Martins"
-   - Operação "Multium Cursos" é redundante
-
----
-
-## ✅ **CORREÇÕES APLICADAS NO FRONTEND:**
-
-### **1. AppSidebar.tsx**
-
-#### **Fix 1: Dropdown não sumia**
-```tsx
-// ANTES:
-<div className="space-y-1">
-  <Select value={currentTeam?.team_id || ''} onValueChange={switchTeam}>
-
-// DEPOIS:
-<div className="space-y-1" key={currentTeam?.team_id || 'no-team'}>
-  <Select value={currentTeam?.team_id || ''} onValueChange={(value) => {
-    console.log('Switching to team:', value);
-    switchTeam(value);
-  }}>
-```
-
-**Por que funciona:**
-- `key` força React a re-criar o componente quando muda de operação
-- Log ajuda a debugar switches
-- Fallback explícito no value
-
-#### **Fix 2: SelectValue com fallback**
-```tsx
-// ANTES:
-<SelectValue placeholder="Selecione uma operação" />
-
-// DEPOIS:
-<SelectValue placeholder="Selecione uma operação">
-  {currentTeam?.team_name || 'Selecione uma operação'}
-</SelectValue>
-```
-
-**Por que funciona:**
-- Mostra nome da operação mesmo se SelectValue não renderizar corretamente
-- Previne elemento vazio
-
-#### **Fix 3: Botão Sair funcional**
-```tsx
-// ANTES:
-<SidebarMenuButton asChild>
-  <Button onClick={signOut} variant="ghost">
-
-// DEPOIS:
-<Button
-  onClick={async () => {
-    console.log('Logout clicked');
-    await signOut();
-  }}
-  variant="ghost"
->
-```
-
-**Por que funciona:**
-- Remove `SidebarMenuButton asChild` que interceptava o click
-- onClick direto no Button
-- Async/await explícito
-- Log para confirmar clique
-
----
-
-## 📊 **MIGRAÇÃO DE DADOS:**
-
-### **Arquivo: `MIGRATION_CONSOLIDATE_CAIO.sql`**
-
-**O que faz:**
-1. ✅ Move TODAS as campanhas de "Multium Cursos" → "Caio Martins"
-2. ✅ Move TODOS os vendedores de "Multium Cursos" → "Caio Martins"
-3. ✅ Move TODOS os clicks de "Multium Cursos" → "Caio Martins"
-4. ✅ Atualiza `full_slug` das campanhas movidas
-5. ✅ Migra membros (sem duplicar)
-6. ✅ **EXCLUI operação "Multium Cursos"**
-
----
-
-## 🎯 **INSTRUÇÕES DE DEPLOY:**
-
-### **PASSO 1: Executar Migration de Consolidação**
-
-```bash
-# No Supabase SQL Editor, execute:
-# MIGRATION_CONSOLIDATE_CAIO.sql (todo o arquivo)
-```
-
-**Resultado esperado:**
-```
-✅ Campanhas movidas de Multium Cursos → Caio Martins: X
-✅ Vendedores movidos de Multium Cursos → Caio Martins: Y
-✅ Clicks movidos de Multium Cursos → Caio Martins: Z
-✅ Membros migrados para Caio Martins
-✅ Membros removidos de Multium Cursos
-✅ Operação Multium Cursos EXCLUÍDA
-
-CONSOLIDAÇÃO CONCLUÍDA COM SUCESSO!
-Operação Caio Martins agora possui:
-  - Vendedores: X
-  - Campanhas: Y
-  - Clicks: Z
-
-✅ Multium Cursos foi excluído com sucesso
-```
-
-### **PASSO 2: Commit e Push do Frontend**
-
-```bash
-git add -A
 git commit -m "fix: corrige dropdown sumindo e botão sair não funcionando
-
-- Adiciona key no dropdown para forçar re-render correto
-- Remove SidebarMenuButton asChild que interceptava onClick
-- Adiciona fallback explícito no SelectValue
-- Adiciona logs para debug
-- Migration para consolidar dados em Caio Martins e excluir Multium Cursos"
-
 git push origin main
-```
+# FIXES_APPLIED
 
-### **PASSO 3: Restart no Easypanel**
+## Bloqueio de Renderização de Autenticação
 
-1. Easypanel → Seu App
-2. **Redeploy** (vai pegar código novo do GitHub)
-3. Aguarde build
+### Problema
+Ao recarregar a aplicação (F5) ou acessar diretamente uma rota protegida, o React montava árvore de componentes e iniciava chamadas (queries Supabase, lógica de roteamento) **antes** de a verificação assíncrona da sessão terminar. Isso criava:
+- Tela branca intermitente (componentes dependentes de `user` ou `session` quebravam/retornavam estados inconsistentes).
+- Dashboard sem dados porque requisições eram disparadas sem sessão RLS efetiva.
+- Redirecionamentos incorretos (ex: ir para `/dashboard` sem sessão, ou ficar em `/login` mesmo já autenticado via token persistido).
 
-### **PASSO 4: Limpar Cache e Testar**
+### Causa Raiz
+Race condition entre:
+1. Montagem inicial da árvore de rotas (`React Router`).
+2. Execução de efeitos de leitura da sessão (`supabase.auth.getSession()` + eventos `onAuthStateChange`).
+3. Componentes consumidores (Dashboard, ProtectedRoute, TeamContext) disparando queries dependentes de `user`/`session` antes da resolução.
 
-1. Feche TODAS as abas
-2. Cmd+Shift+Delete → Clear cache
-3. Reabra aplicação
-4. Faça login
+Sem bloqueio explícito, a aplicação passava por estados transitórios onde `user === null` mas a sessão já existia no storage/cookies. Queries sob RLS retornavam vazio ou eram rejeitadas, levando a caches inconsistentes.
 
----
+### Solução Implementada
+1. `AuthContext` passou a expor `isVerifyingAuth` (alias de `isAuthLoading`) que representa a janela em que a sessão inicial está sendo validada.
+2. O componente raiz (`App.tsx`) agora **bloqueia totalmente** a montagem do roteador enquanto `isVerifyingAuth` é `true`. Nenhum componente dependente de auth é montado até conclui-la.
+3. `ProtectedRoute` simplificado para usar `isVerifyingAuth` apenas como fallback redundante (defensivo).
+4. Future flag `v7_startTransition` ativada no `React Router` via Data Router (`createBrowserRouter` + `RouterProvider`) para compatibilidade futura e transições mais suaves.
 
-## ✅ **CHECKLIST DE TESTES:**
+### Benefícios
+- Elimina janela inconsistente onde componentes protegidos montam sem sessão resolvida.
+- Garante que requisições RLS são feitas somente com sessão válida, evitando dados vazios iniciais.
+- Redirecionamentos pós-refresh ficam determinísticos (login vs dashboard).
+- Base para futura adoção de loaders sem efeitos paralelos.
 
-Após deploy:
+### Próximos Passos (Opcional)
+- Migrar lógica de proteção para loaders (`redirect` server-side no Data Router) eliminando `ProtectedRoute` por completo.
+- Adicionar métrica de tempo de verificação de sessão (performance observability). 
+- Implementar UI de fallback mais rica (ex: skeleton + mensagens de diagnóstico se falhar).
 
-- [ ] Login funciona
-- [ ] Dropdown mostra apenas 2 operações: Caio Martins, Gustavo de Castro
-- [ ] ~~Multium Cursos não aparece mais~~
-- [ ] Dropdown **NÃO SOME** ao navegar entre páginas
-- [ ] Dropdown **NÃO SOME** ao trocar de operação
-- [ ] Botão "Sair" funciona e desloga
-- [ ] Campanhas de Caio Martins carregam (todas consolidadas)
-- [ ] Vendedores de Caio Martins carregam (todos consolidados)
-- [ ] Dashboard mostra estatísticas corretas
-- [ ] Console não mostra erros (F12)
-
----
-
-## 🐛 **SE AINDA TIVER PROBLEMAS:**
-
-### **Dropdown ainda some?**
-```sql
--- Verificar se há erro no console (F12)
--- Verificar se currentTeam está null:
-SELECT * FROM get_user_teams();
-```
-
-### **Botão Sair ainda não funciona?**
-```javascript
-// Abra Console (F12) e digite:
-console.log('Testing logout');
-// Clique no botão Sair
-// Deve aparecer: "Logout clicked"
-```
-
-### **Multium Cursos ainda aparece?**
-```sql
--- Verificar se foi excluído:
-SELECT * FROM teams WHERE slug = 'multium-cursos';
--- Deve retornar: 0 rows
-
--- Se ainda existir, forçar exclusão:
-DELETE FROM team_members WHERE team_id IN (SELECT id FROM teams WHERE slug = 'multium-cursos');
-DELETE FROM teams WHERE slug = 'multium-cursos';
-```
+### Referências de Arquivos
+- `src/contexts/AuthContext.tsx` — adicionada propriedade `isVerifyingAuth`.
+- `src/App.tsx` — criação de `AppInner` que bloqueia renderização do roteador.
+- `src/components/ProtectedRoute.tsx` — atualizado para usar `isVerifyingAuth`.
 
 ---
-
-## 📝 **RESUMO DAS MUDANÇAS:**
-
-### **Frontend:**
-- ✅ `AppSidebar.tsx`: key no dropdown, fallback no SelectValue, botão Sair direto
-- ✅ Logs adicionados para debug
-
-### **Backend:**
-- ✅ `MIGRATION_CONSOLIDATE_CAIO.sql`: consolida tudo em Caio Martins
-- ✅ Exclui operação "Multium Cursos" redundante
-
-### **Estrutura Final:**
-```
-┌─────────────────────────────────────────┐
-│ OPERAÇÃO: Caio Martins                  │
-├─────────────────────────────────────────┤
-│ ✅ TODOS vendedores (SEM sufixo 2)     │
-│ ✅ TODAS campanhas (SEM sufixo 2)      │
-│ ✅ Clicks consolidados                  │
-└─────────────────────────────────────────┘
-
-┌─────────────────────────────────────────┐
-│ OPERAÇÃO: Gustavo de Castro             │
-├─────────────────────────────────────────┤
-│ ✅ Vendedores COM sufixo 2              │
-│ ✅ Campanhas COM sufixo 2               │
-│ ✅ Clicks independentes                 │
-└─────────────────────────────────────────┘
-
-❌ Multium Cursos → EXCLUÍDO
-```
-
----
-
-**🚀 PRÓXIMOS PASSOS:**
-
-1. Execute `MIGRATION_CONSOLIDATE_CAIO.sql` no Supabase
-2. Commit e push do código
-3. Redeploy no Easypanel
-4. Teste completo
-
-**Me confirme após executar a migration! 📊**
+Última atualização: 2025-11-06

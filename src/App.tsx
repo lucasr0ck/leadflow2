@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Navigate, createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { TeamProvider } from '@/contexts/TeamContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -24,6 +24,7 @@ import NotFound from "./pages/NotFound";
 import { RobustErrorBoundary } from '@/components/RobustErrorBoundary';
 import { DebugPanel } from '@/components/DebugPanel';
 import { DiagnosticPanel } from '@/components/DiagnosticPanel';
+import { GlobalSpinner } from '@/components/GlobalSpinner';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,118 +41,129 @@ const DEBUG_MODE = process.env.NODE_ENV === 'development' || localStorage.getIte
 // Diagnostic panel - sempre ativo em dev, ou com flag LEADFLOW_DIAGNOSTIC
 const SHOW_DIAGNOSTIC = process.env.NODE_ENV === 'development' || localStorage.getItem('LEADFLOW_DIAGNOSTIC') === 'true';
 
-const AppRoutes = () => {
-  const { user, loading } = useAuth();
-
-  if (loading) {
+// Componente raiz que decide entre Login ou Dashboard
+const RootIndex: React.FC = () => {
+  const { user, isAuthLoading } = useAuth();
+  if (isAuthLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-slate-600">Carregando...</div>
       </div>
     );
   }
+  return user ? <Navigate to="/dashboard" replace /> : <Login />;
+};
 
-  return (
-    <Routes>
-      <Route 
-        path="/" 
-        element={user ? <Navigate to="/dashboard" replace /> : <Login />} 
-      />
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Dashboard />} />
-      </Route>
-      <Route
-        path="/sellers"
-        element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Sellers />} />
-      </Route>
-      <Route
-        path="/sellers/new"
-        element={
-          <ProtectedRoute>
-            <CreateSeller />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/campaigns"
-        element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Campaigns />} />
-      </Route>
-      <Route
-        path="/campaigns/new"
-        element={
-          <ProtectedRoute>
-            <CreateCampaign />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/campaigns/edit/:id"
-        element={
-          <ProtectedRoute>
-            <EditCampaign />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/analytics"
-        element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Analytics />} />
-      </Route>
-      <Route
-        path="/analytics/campaign/:id"
-        element={
-          <CampaignAnalytics />
-        }
-      />
-      <Route
-        path="/audit-logs"
-        element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<AuditLogs />} />
-      </Route>
-      <Route
-        path="/settings/teams"
-        element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<TeamManagement />} />
-      </Route>
-      {/* Public redirect route - no authentication required */}
-      <Route path="/r/:slug" element={<PublicRedirect />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  );
+// Rotas usando Data Router para habilitar future flag v7_startTransition
+const router = createBrowserRouter([
+  { path: '/', element: <RootIndex /> },
+  // Rota explícita de login para suportar redirecionamentos diretos (ex.: signOut)
+  { path: '/login', element: <RootIndex /> },
+  {
+    path: '/dashboard',
+    element: (
+      <ProtectedRoute>
+        <MainLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Dashboard /> },
+    ],
+  },
+  {
+    path: '/sellers',
+    element: (
+      <ProtectedRoute>
+        <MainLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Sellers /> },
+    ],
+  },
+  {
+    path: '/sellers/new',
+    element: (
+      <ProtectedRoute>
+        <CreateSeller />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/campaigns',
+    element: (
+      <ProtectedRoute>
+        <MainLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Campaigns /> },
+    ],
+  },
+  {
+    path: '/campaigns/new',
+    element: (
+      <ProtectedRoute>
+        <CreateCampaign />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/campaigns/edit/:id',
+    element: (
+      <ProtectedRoute>
+        <EditCampaign />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/analytics',
+    element: (
+      <ProtectedRoute>
+        <MainLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Analytics /> },
+    ],
+  },
+  {
+    path: '/analytics/campaign/:id',
+    element: <CampaignAnalytics />,
+  },
+  {
+    path: '/audit-logs',
+    element: (
+      <ProtectedRoute>
+        <MainLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <AuditLogs /> },
+    ],
+  },
+  {
+    path: '/settings/teams',
+    element: (
+      <ProtectedRoute>
+        <MainLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <TeamManagement /> },
+    ],
+  },
+  { path: '/r/:slug', element: <PublicRedirect /> },
+  { path: '*', element: <NotFound /> },
+]);
+
+const AppInner: React.FC = () => {
+  const { isVerifyingAuth } = useAuth();
+  if (isVerifyingAuth) {
+    // Bloqueio total: nada da árvore de rotas ou layout é montado ainda
+    return <GlobalSpinner />;
+  }
+  return <RouterProvider router={router} future={{ v7_startTransition: true }} />;
 };
 
 const App = () => (
@@ -161,13 +173,11 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
-            <RobustErrorBoundary>
-              <AppRoutes />
-              {DEBUG_MODE && <DebugPanel />}
-              {SHOW_DIAGNOSTIC && <DiagnosticPanel />}
-            </RobustErrorBoundary>
-          </BrowserRouter>
+          <RobustErrorBoundary>
+            <AppInner />
+            {DEBUG_MODE && <DebugPanel />}
+            {SHOW_DIAGNOSTIC && <DiagnosticPanel />}
+          </RobustErrorBoundary>
         </TooltipProvider>
       </TeamProvider>
     </AuthProvider>

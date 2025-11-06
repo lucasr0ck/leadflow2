@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTeam } from '@/contexts/TeamContext';
 import { GlobalSpinner } from '@/components/GlobalSpinner';
@@ -16,29 +16,30 @@ interface ProtectedRouteProps {
  * 2. If authenticated, teams are loaded (or confirmed as empty)
  */
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, isVerifyingAuth } = useAuth();
+  const location = useLocation();
   const { loading: teamLoading, currentTeam, availableTeams } = useTeam();
 
   useEffect(() => {
     console.log('[ProtectedRoute] State:', {
-      authLoading,
+  isVerifyingAuth,
       teamLoading,
       hasUser: !!user,
       hasTeam: !!currentTeam,
       teamsCount: availableTeams.length,
     });
-  }, [authLoading, teamLoading, user, currentTeam, availableTeams]);
+  }, [isVerifyingAuth, teamLoading, user, currentTeam, availableTeams]);
 
-  // Wait for auth
-  if (authLoading) {
-    console.log('[ProtectedRoute] Waiting for auth');
+  // Bloqueio de verificação já tratado em AppInner. Só por segurança se chegar aqui.
+  if (isVerifyingAuth) {
+    console.log('[ProtectedRoute] (redundant) Still verifying auth');
     return <GlobalSpinner />;
   }
 
   // No user? Redirect to login
   if (!user) {
-    console.log('[ProtectedRoute] No user, redirecting');
-    return <Navigate to="/" replace />;
+    console.log('[ProtectedRoute] No user, redirecting to /login');
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
   // Wait for teams to load

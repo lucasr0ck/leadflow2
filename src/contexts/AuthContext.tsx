@@ -7,7 +7,9 @@ import { useAuditLog } from '@/hooks/useAuditLog';
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  loading: boolean;
+  isAuthLoading: boolean; // Novo nome sem ambiguidade com outros loadings
+  isVerifyingAuth: boolean; // Alias explícito para padrão de bloqueio de render
+  hasResolvedAuth: boolean; // true após primeira resolução (mesmo que sem usuário)
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
@@ -17,92 +19,61 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [hasResolvedAuth, setHasResolvedAuth] = useState(false);
   const { logAudit } = useAuditLog();
 
   useEffect(() => {
-    console.log('🟡🟡🟡 [AuthProvider] USEEFFECT INICIOU - Initializing authentication...');
-    
-    let isInitialized = false; // Prevenir múltiplas inicializações
-    
-    // 1. PRIMEIRO: Buscar sessão existente (síncrono, imediato)
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) {
-        console.error('🟡❌ [AuthProvider] ERRO ao buscar sessão:', error);
-      }
-      
-      console.log('🟡 [AuthProvider] Sessão inicial:', session?.user?.email || 'NO SESSION');
-      
-      // Definir estado inicial APENAS se ainda não foi inicializado
-      if (!isInitialized) {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-        isInitialized = true;
-        
-        console.log('🟡✅ [AuthProvider] Estado inicial configurado:', {
-          hasSession: !!session,
-          hasUser: !!session?.user,
-          email: session?.user?.email,
-          loading: false
+    let cancelled = false;
+
+    const init = async () => {
+      console.log('[AuthProvider] 🔄 Inicializando verificação de sessão...');
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          console.warn('[AuthProvider] Sessão inicial erro:', error.message);
+        }
+        if (cancelled) return;
+        setSession(data.session);
+        setUser(data.session?.user ?? null);
+        setHasResolvedAuth(true);
+        setIsAuthLoading(false);
+        console.log('[AuthProvider] ✅ Sessão inicial resolvida:', {
+          hasUser: !!data.session?.user,
+          email: data.session?.user?.email,
         });
+      } catch (e) {
+        if (cancelled) return;
+        console.error('[AuthProvider] ❌ Falha ao obter sessão inicial:', e);
+        setHasResolvedAuth(true);
+        setIsAuthLoading(false);
       }
-    }).catch((error) => {
-      console.error('🟡❌ [AuthProvider] FALHA ao buscar sessão:', error);
-      if (!isInitialized) {
-        setLoading(false);
-        isInitialized = true;
+    };
+
+    init();
+
+    // Listener para mudanças futuras
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (cancelled) return;
+      console.log('[AuthProvider] Auth event:', event);
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (!hasResolvedAuth) {
+        setHasResolvedAuth(true);
+        setIsAuthLoading(false);
+      }
+      if (event === 'SIGNED_IN' && session?.user) {
+        await logAudit({ action_type: 'login', metadata: { email: session.user.email, event } });
+      } else if (event === 'SIGNED_OUT') {
+        await logAudit({ action_type: 'logout', metadata: { event } });
       }
     });
 
-    // 2. DEPOIS: Configurar listener para mudanças futuras
-    console.log('🟡 [AuthProvider] Configurando onAuthStateChange listener...');
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('🟡🟡🟡 [AuthProvider] AUTH STATE CHANGE:', event);
-        console.log('🟡 [AuthProvider] Session:', session?.user?.email || 'NO SESSION');
-        
-        // Atualizar estado em mudanças futuras
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Garantir que loading seja false após qualquer mudança de auth
-        if (!isInitialized) {
-          setLoading(false);
-          isInitialized = true;
-        }
-        
-        console.log('🟡 [AuthProvider] State atualizado:', { 
-          event,
-          hasSession: !!session, 
-          hasUser: !!session?.user,
-        });
-
-        // Log authentication events
-        if (event === 'SIGNED_IN' && session?.user) {
-          await logAudit({
-            action_type: 'login',
-            metadata: {
-              email: session.user.email,
-              event: event,
-            }
-          });
-        } else if (event === 'SIGNED_OUT') {
-          await logAudit({
-            action_type: 'logout',
-            metadata: {
-              event: event,
-            }
-          });
-        }
-      }
-    );
-
     return () => {
-      console.log('🟡 [AuthProvider] Limpando subscription...');
+      cancelled = true;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [hasResolvedAuth, logAudit]);
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -127,13 +98,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('🔴🔴🔴 [AuthContext] signOut CALLED - INÍCIO');
     
     // Prevent multiple simultaneous calls
-    if (loading) {
+    if (isAuthLoading) {
       console.log('🔴⚠️ [AuthContext] signOut já em andamento, ignorando chamada duplicada');
       return;
     }
     
     try {
-      setLoading(true);
+  setIsAuthLoading(true);
       console.log('🔴 [AuthContext] Chamando supabase.auth.signOut()...');
       
       // Limpar localStorage ANTES de fazer signOut para evitar race conditions
@@ -161,12 +132,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.clear();
       window.location.href = '/login';
     } finally {
-      setLoading(false);
+      setIsAuthLoading(false);
     }
-  }, [loading]);
+  }, [isAuthLoading]);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, isAuthLoading, isVerifyingAuth: isAuthLoading, hasResolvedAuth, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

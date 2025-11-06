@@ -21,20 +21,18 @@ export async function ensureSupabaseSession(): Promise<Session | null> {
   if (!pendingSessionPromise) {
     pendingSessionPromise = new Promise<Session | null>((resolve) => {
       let settled = false;
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      let pollId: ReturnType<typeof setInterval> | undefined;
+  // eslint-disable-next-line prefer-const
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  // eslint-disable-next-line prefer-const
+  let pollId: ReturnType<typeof setInterval> | undefined;
       let activeSubscription: { unsubscribe: () => void } | null = null;
       let polling = false;
 
       const finish = (session: Session | null) => {
         if (settled) return;
         settled = true;
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
-        if (pollId) {
-          clearInterval(pollId);
-        }
+  if (timeoutId) clearTimeout(timeoutId);
+  if (pollId) clearInterval(pollId);
         activeSubscription?.unsubscribe();
         pendingSessionPromise = null;
         resolve(session);
