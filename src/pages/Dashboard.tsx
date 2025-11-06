@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTeam } from '@/contexts/TeamContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { format, subDays, startOfDay } from 'date-fns';
+import { format, subDays, startOfDay, addDays } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ensureSupabaseSession } from '@/utils/supabaseSession';
@@ -58,63 +58,79 @@ export const Dashboard = () => {
     if (!currentTeam) return;
 
     try {
+      // Garante sessão antes dos selects (evita RLS vazio em primeiro carregamento)
       await ensureSupabaseSession();
 
-      // Fetch stats
-      const [sellersRes, campaignsRes, clicksRes] = await Promise.all([
-        supabase.from('sellers').select('id').eq('team_id', currentTeam.team_id),
-        supabase.from('campaigns').select('id').eq('team_id', currentTeam.team_id),
+      // Contagens mais performáticas usando head + count
+      const [sellersRes, campaignsRes, clicksTodayRes] = await Promise.all([
+        supabase
+          .from('sellers')
+          .select('*', { count: 'exact', head: true })
+          .eq('team_id', currentTeam.team_id),
+        supabase
+          .from('campaigns')
+          .select('*', { count: 'exact', head: true })
+          .eq('team_id', currentTeam.team_id),
         supabase
           .from('clicks')
-          .select('id, campaign_id, campaigns!inner(team_id)')
+          .select('*', { count: 'exact', head: true })
+          .eq('team_id', currentTeam.team_id)
           .gte('created_at', startOfDay(new Date()).toISOString())
-          .eq('campaigns.team_id', currentTeam.team_id),
       ]);
 
       setStats({
-        activeSellers: sellersRes.data?.length || 0,
-        activeCampaigns: campaignsRes.data?.length || 0,
-        totalClicksToday: clicksRes.data?.length || 0,
+        activeSellers: sellersRes.count || 0,
+        activeCampaigns: campaignsRes.count || 0,
+        totalClicksToday: clicksTodayRes.count || 0,
       });
 
-      // Fetch chart data for last 30 days
-      const chartPromises = [];
+      // Série últimos 30 dias (client-side aggregation simples)
+  const chartPromises: Array<Promise<ChartData>> = [];
       for (let i = 29; i >= 0; i--) {
-        const date = subDays(new Date(), i);
-        const dateStr = format(date, 'yyyy-MM-dd');
-        
-        chartPromises.push(
-          supabase
+        const dayStart = subDays(startOfDay(new Date()), i);
+        const dayEnd = addDays(dayStart, 1);
+        const p: Promise<ChartData> = (async () => {
+          const res = await supabase
             .from('clicks')
-            .select('id, campaign_id, campaigns!inner(team_id)')
-            .gte('created_at', startOfDay(date).toISOString())
-            .lt('created_at', startOfDay(subDays(date, -1)).toISOString())
-            .eq('campaigns.team_id', currentTeam.team_id)
-            .then(res => ({
-              date: format(date, 'MM/dd'),
-              clicks: res.data?.length || 0,
-            }))
-        );
+            .select('id', { count: 'exact', head: true })
+            .eq('team_id', currentTeam.team_id)
+            .gte('created_at', dayStart.toISOString())
+            .lt('created_at', dayEnd.toISOString());
+          return {
+            date: format(dayStart, 'MM/dd'),
+            clicks: res.count || 0,
+          };
+        })();
+        chartPromises.push(p);
       }
-
       const chartResults = await Promise.all(chartPromises);
       setChartData(chartResults);
 
-      // Fetch recent campaigns
-      const { data: campaigns } = await supabase
+      // Campanhas recentes com contagem de clicks (usar relacionamento se definido ou fallback a segunda query)
+      const { data: campaigns, error: campaignsError } = await supabase
         .from('campaigns')
-        .select(`
-          id,
-          name,
-          slug,
-          created_at,
-          clicks(count)
-        `)
+        .select(`id,name,slug,created_at`)
         .eq('team_id', currentTeam.team_id)
         .order('created_at', { ascending: false })
         .limit(5);
 
-      setRecentCampaigns(campaigns || []);
+      if (campaignsError) {
+        console.warn('[Dashboard] campaigns fetch error', campaignsError);
+      }
+
+      // Para cada campanha, contar clicks (pode virar RPC/EMBED depois)
+      const enriched = await Promise.all(
+        (campaigns || []).map(async (c) => {
+          const { count } = await supabase
+            .from('clicks')
+            .select('id', { count: 'exact', head: true })
+            .eq('team_id', currentTeam.team_id)
+            .eq('campaign_id', c.id);
+          return { ...c, clicks: [{ count: count || 0 }] };
+        })
+      );
+
+      setRecentCampaigns(enriched);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     }
