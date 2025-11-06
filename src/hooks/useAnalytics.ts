@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTeam } from '@/contexts/TeamContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { ensureSupabaseSession } from '@/utils/supabaseSession';
 
 interface AnalyticsData {
   totalClicks: number;
@@ -83,6 +84,8 @@ export const useAnalytics = (dateRange: DateRange) => {
         teamId: currentTeam.team_id,
         teamName: currentTeam.team_name
       });
+
+      await ensureSupabaseSession();
 
       // Use RPC functions for optimized queries (no 1000 row limit!)
       const startDate = dateRange.start.toISOString();
