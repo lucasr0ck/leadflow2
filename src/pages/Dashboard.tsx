@@ -74,28 +74,25 @@ export const Dashboard = () => {
         .from('sellers')
         .select('id', { count: 'exact', head: true })
         .eq('team_id', currentTeam.team_id);
+      console.log('[Dashboard] sellers fetch:', sellersRes);
 
       const campaignsRes = await sb
         .from('campaigns')
         .select('id', { count: 'exact', head: true })
         .eq('team_id', currentTeam.team_id);
+      console.log('[Dashboard] campaigns fetch:', campaignsRes);
 
       const clicksTodayRes = await sb
         .from('clicks')
         .select('id', { count: 'exact', head: true })
         .eq('team_id', currentTeam.team_id)
         .gte('created_at', startOfDay(new Date()).toISOString());
+      console.log('[Dashboard] clicksToday fetch:', clicksTodayRes);
 
       setStats({
         activeSellers: sellersRes.count || 0,
         activeCampaigns: campaignsRes.count || 0,
         totalClicksToday: clicksTodayRes.count || 0,
-      });
-
-      console.log('[Dashboard] Counters:', {
-        sellers: sellersRes.count,
-        campaigns: campaignsRes.count,
-        clicksToday: clicksTodayRes.count,
       });
 
       // Série últimos 30 dias (client-side aggregation simples)
@@ -110,6 +107,10 @@ export const Dashboard = () => {
             .eq('team_id', currentTeam.team_id)
             .gte('created_at', dayStart.toISOString())
             .lt('created_at', dayEnd.toISOString());
+          console.log('[Dashboard] chart day fetch:', {
+            date: format(dayStart, 'MM/dd'),
+            res,
+          });
           return {
             date: format(dayStart, 'MM/dd'),
             clicks: res.count || 0,
@@ -118,15 +119,22 @@ export const Dashboard = () => {
         chartPromises.push(p);
       }
       const chartResults = await Promise.all(chartPromises);
-  setChartData(chartResults);
+      setChartData(chartResults);
 
       // Campanhas recentes com contagem de clicks (usar relacionamento se definido ou fallback a segunda query)
-      const { data: campaigns, error: campaignsError } = await supabase
+      const { data: campaigns, error: campaignsError, status: campaignsStatus } = await supabase
         .from('campaigns')
         .select(`id,name,slug,created_at`)
         .eq('team_id', currentTeam.team_id)
         .order('created_at', { ascending: false })
         .limit(5);
+
+      console.log('[Dashboard] recent campaigns fetch:', {
+        status: campaignsStatus,
+        error: campaignsError,
+        data: campaigns,
+        teamId: currentTeam.team_id,
+      });
 
       if (campaignsError) {
         console.warn('[Dashboard] campaigns fetch error', campaignsError);
@@ -140,6 +148,10 @@ export const Dashboard = () => {
               .select('id', { count: 'exact', head: true })
               .eq('team_id', currentTeam.team_id)
               .eq('campaign_id', c.id);
+            console.log('[Dashboard] campaign clicks fetch:', {
+              campaignId: c.id,
+              res,
+            });
             return { ...c, clicks: [{ count: res.count || 0 }] };
           })
         );

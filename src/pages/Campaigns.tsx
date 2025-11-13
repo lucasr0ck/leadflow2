@@ -71,7 +71,7 @@ export const Campaigns = () => {
       await ensureSupabaseSession();
 
       // Fetch campaigns with basic data - seller distribution is now dynamic
-      const { data: campaignsData, error: campaignsError } = await supabase
+      const { data: campaignsData, error: campaignsError, status: campaignsStatus } = await supabase
         .from('campaigns')
         .select(`
           id,
@@ -84,6 +84,14 @@ export const Campaigns = () => {
         .eq('team_id', currentTeam.team_id)
         .order('created_at', { ascending: false });
 
+      console.log('[Campaigns] campaigns fetch:', {
+        status: campaignsStatus,
+        error: campaignsError,
+        data: campaignsData,
+        teamId: currentTeam.team_id,
+        teamName: currentTeam.team_name,
+      });
+
       if (campaignsError) {
         console.error('[Campaigns] Error fetching campaigns:', campaignsError);
         throw campaignsError;
@@ -94,7 +102,7 @@ export const Campaigns = () => {
         return;
       }
 
-      console.log('[Campaigns] Fetched', campaignsData.length, 'campaigns');
+      console.log('[Campaigns] Fetched', campaignsData.length, 'campaigns:', campaignsData);
 
       // ✅ CRITICAL FIX: Fetch sellers ONCE for all campaigns (not per campaign)
       // This prevents multiple identical queries and potential RLS issues
@@ -107,15 +115,18 @@ export const Campaigns = () => {
       console.log('[Campaigns] 🔍 Supabase client:', supabase ? 'OK' : 'MISSING');
       
       // @ts-ignore - TypeScript issue with deep Supabase types
-      const { data: sellersData, error: sellersError } = await supabase
+      const { data: sellersData, error: sellersError, status: sellersStatus } = await supabase
         .from('sellers')
         .select('name, weight')
         .eq('team_id', currentTeam.team_id)
         .eq('is_active', true);
 
-      console.log('[Campaigns] 🔍 Sellers query result:');
-      console.log('[Campaigns] - Data:', sellersData);
-      console.log('[Campaigns] - Error:', sellersError);
+      console.log('[Campaigns] sellers fetch:', {
+        status: sellersStatus,
+        error: sellersError,
+        data: sellersData,
+        teamId: currentTeam.team_id,
+      });
 
       if (sellersError) {
         console.error('[Campaigns] ❌ Error fetching sellers:', {
@@ -138,18 +149,30 @@ export const Campaigns = () => {
       const campaignsWithMetrics = await Promise.all(
         campaignsData.map(async (campaign) => {
           // Get total clicks
-          const { data: totalClicksData } = await supabase
+          const { data: totalClicksData, error: totalClicksError, status: totalClicksStatus } = await supabase
             .from('clicks')
             .select('id')
             .eq('campaign_id', campaign.id);
+          console.log('[Campaigns] totalClicks fetch:', {
+            campaignId: campaign.id,
+            status: totalClicksStatus,
+            error: totalClicksError,
+            data: totalClicksData,
+          });
 
           // Get clicks from last 7 days
           const sevenDaysAgo = startOfDay(subDays(new Date(), 7));
-          const { data: recentClicksData } = await supabase
+          const { data: recentClicksData, error: recentClicksError, status: recentClicksStatus } = await supabase
             .from('clicks')
             .select('id')
             .eq('campaign_id', campaign.id)
             .gte('created_at', sevenDaysAgo.toISOString());
+          console.log('[Campaigns] recentClicks fetch:', {
+            campaignId: campaign.id,
+            status: recentClicksStatus,
+            error: recentClicksError,
+            data: recentClicksData,
+          });
 
           // Use the sellers fetched once above (shared across all campaigns)
           return {
