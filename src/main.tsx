@@ -20,15 +20,15 @@ try {
   if (!rootElement) {
     throw new Error("Root element not found");
   }
-  
-  const root = createRoot(rootElement);
-  root.render(<App />);
-} catch (error) {
-  console.error('Failed to initialize application:', error);
-  
-  // Display error on page
-  const rootElement = document.getElementById("root");
-  if (rootElement) {
+
+  // Detect missing Supabase env vars before rendering
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  let missingVars = [];
+  if (!supabaseUrl) missingVars.push('VITE_SUPABASE_URL');
+  if (!supabaseAnonKey) missingVars.push('VITE_SUPABASE_ANON_KEY');
+
+  if (missingVars.length > 0) {
     rootElement.innerHTML = `
       <div style="
         min-height: 100vh;
@@ -47,22 +47,24 @@ try {
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         ">
           <h1 style="color: #dc2626; margin-bottom: 1rem; font-size: 1.25rem;">
-            Application Initialization Error
+            Variáveis de ambiente ausentes
           </h1>
           <p style="color: #475569; margin-bottom: 1rem;">
-            The application failed to start. Please check the browser console for more details.
+            O aplicativo não pode iniciar porque as seguintes variáveis não estão definidas:<br>
+            <strong>${missingVars.join(', ')}</strong>
           </p>
-          <details style="margin-bottom: 1rem;">
-            <summary style="cursor: pointer; color: #64748b;">Error Details</summary>
-            <pre style="
-              background: #f1f5f9;
-              padding: 0.5rem;
-              border-radius: 4px;
-              font-size: 0.875rem;
-              overflow: auto;
-              margin-top: 0.5rem;
-            ">${error instanceof Error ? error.message : String(error)}</pre>
-          </details>
+          <ul style="color: #64748b; margin-bottom: 1rem;">
+            <li>Crie um arquivo <code>.env.local</code> na raiz do projeto.</li>
+            <li>Adicione as variáveis conforme o exemplo abaixo:</li>
+          </ul>
+          <pre style="background: #f1f5f9; padding: 0.5rem; border-radius: 4px; font-size: 0.875rem; overflow: auto; margin-bottom: 1rem;">
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+          </pre>
+          <p style="color: #475569; margin-bottom: 1rem;">
+            Após salvar, reinicie o servidor de desenvolvimento.<br>
+            <code>npm run dev</code>
+          </p>
           <button onclick="window.location.reload()" style="
             padding: 0.5rem 1rem;
             background: #2563eb;
@@ -71,10 +73,16 @@ try {
             border-radius: 4px;
             cursor: pointer;
           ">
-            Reload Page
+            Recarregar página
           </button>
         </div>
       </div>
     `;
+    throw new Error('Missing required environment variables: ' + missingVars.join(', '));
   }
+
+  const root = createRoot(rootElement);
+  root.render(<App />);
+} catch (error) {
+  console.error('Failed to initialize application:', error);
 }

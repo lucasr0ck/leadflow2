@@ -16,13 +16,29 @@ console.log('[Supabase Client] - VITE_SUPABASE_URL:', supabaseUrl ? 'DEFINED' : 
 console.log('[Supabase Client] - VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? `DEFINED (${supabaseAnonKey.substring(0, 20)}...)` : 'UNDEFINED');
 console.log('[Supabase Client] - VITE_SUPABASE_SERVICE_ROLE_KEY:', supabaseServiceRoleKey ? `DEFINED (${supabaseServiceRoleKey.substring(0, 20)}...)` : 'UNDEFINED');
 
-// SEMPRE usar ANON no cliente
+// Determine which key to use in runtime
+// In the browser we must always use the ANON key. If a service role key is present
+// in the VITE_* env (meaning it would be embedded in the bundle) we treat that as
+// a configuration error and fail fast to avoid exposing the service role.
+const isBrowser = typeof window !== 'undefined';
+if (isBrowser && supabaseServiceRoleKey) {
+  console.error('[Supabase Client] CRITICAL: VITE_SUPABASE_SERVICE_ROLE_KEY is defined in client build.');
+  console.error('[Supabase Client] This will expose your SERVICE_ROLE key to end users and must be removed.');
+  console.error('[Supabase Client] Please remove VITE_SUPABASE_SERVICE_ROLE_KEY from your frontend environment and use it only on the server.');
+  // Throwing prevents the app from booting with an insecure config (you can change to warn if you prefer)
+  throw new Error('Invalid environment: VITE_SUPABASE_SERVICE_ROLE_KEY must not be present in the client build');
+}
+
+// Use ANON key in the client (browser). For non-browser environments (SSRs or serverless functions
+// inside this repo) it's expected those environments explicitly create a server client with the
+// SERVICE_ROLE key where needed.
 const supabaseKey = supabaseAnonKey;
 
 // 🔥 CRITICAL DEBUG: Log what we're working with
 console.log('[Supabase Client] Initializing with:');
 console.log('[Supabase Client] URL:', supabaseUrl);
-console.log('[Supabase Client] Using KEY:', supabaseServiceRoleKey ? 'SERVICE_ROLE (ADMIN)' : 'ANON (Normal)');
+console.log('[Supabase Client] Env contains SERVICE_ROLE_KEY:', !!supabaseServiceRoleKey);
+console.log('[Supabase Client] Using KEY: ANON (Normal)');
 console.log('[Supabase Client] Key (first 20 chars):', supabaseKey?.substring(0, 20) + '...');
 
 // Validate environment variables
