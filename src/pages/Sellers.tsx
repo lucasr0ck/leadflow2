@@ -37,7 +37,7 @@ interface DeleteSellerResponse {
 
 export const Sellers = () => {
   const { user } = useAuth();
-  const { currentTeam } = useTeam();
+  const { currentTeam, loading: teamLoading } = useTeam();
   const { toast } = useToast();
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,8 +51,14 @@ export const Sellers = () => {
     console.log('[Sellers] useEffect triggered:', { 
       hasUser: !!user, 
       hasTeam: !!currentTeam, 
+      teamLoading,
       teamId: currentTeam?.team_id 
     });
+    
+    if (teamLoading) {
+      console.log('[Sellers] Team is loading, waiting...');
+      return;
+    }
     
     // ⚠️ CRITICAL FIX: Verificar se team está disponível
     if (user && currentTeam) {
@@ -62,7 +68,7 @@ export const Sellers = () => {
       console.log('[Sellers] No team or user - stopping loading');
       setLoading(false);
     }
-  }, [user, currentTeam?.team_id]);
+  }, [user, currentTeam?.team_id, teamLoading]);
 
   const fetchSellers = async () => {
     if (!currentTeam) {

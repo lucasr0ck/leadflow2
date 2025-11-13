@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTeam } from '@/contexts/TeamContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,9 +22,9 @@ const campaignSchema = z.object({
 
 type CampaignFormData = z.infer<typeof campaignSchema>;
 
-export const EditCampaign = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { currentTeam } = useTeam();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,26 +40,29 @@ export const EditCampaign = () => {
   });
 
   useEffect(() => {
-    if (user && id) {
+    console.log('[EditCampaign] useEffect:', {
+      user,
+      id,
+      currentTeam,
+    });
+    if (user && id && currentTeam) {
       fetchCampaignData();
     }
-  }, [user, id]);
+  }, [user, id, currentTeam]);
 
   const fetchCampaignData = async () => {
     try {
       setIsLoading(true);
+      console.log('[EditCampaign] fetchCampaignData:', {
+        user,
+        id,
+        currentTeam,
+      });
 
-      // Get user's team
-      const { data: team } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('owner_id', user!.id)
-        .single();
-
-      if (!team) {
+      if (!currentTeam) {
         toast({
           title: "Erro",
-          description: "Time não encontrado.",
+          description: "Time não encontrado (contexto não carregado).",
           variant: "destructive",
         });
         navigate('/campaigns');
@@ -70,8 +74,15 @@ export const EditCampaign = () => {
         .from('campaigns')
         .select('id, name, slug, greeting_message')
         .eq('id', id)
-        .eq('team_id', team.id)
+        .eq('team_id', currentTeam.team_id)
         .single();
+
+      console.log('[EditCampaign] campaign fetch:', {
+        id,
+        teamId: currentTeam.team_id,
+        campaign,
+        campaignError,
+      });
 
       if (campaignError || !campaign) {
         toast({
@@ -101,29 +112,19 @@ export const EditCampaign = () => {
   };
 
   const onSubmit = async (data: CampaignFormData) => {
-    if (!user || !id) return;
+    if (!user || !id || !currentTeam) return;
 
     try {
       setIsSubmitting(true);
-
-      // Get user's team
-      const { data: team } = await supabase
-        .from('teams')
-        .select('id, slug')
-        .eq('owner_id', user.id)
-        .single();
-
-      if (!team) {
-        toast({
-          title: "Erro",
-          description: "Time não encontrado.",
-          variant: "destructive",
-        });
-        return;
-      }
+      console.log('[EditCampaign] onSubmit:', {
+        user,
+        id,
+        currentTeam,
+        data,
+      });
 
       // Generate full_slug: team-slug-campaign-slug
-      const fullSlug = `${team.slug}-${data.slug}`;
+      const fullSlug = `${currentTeam.team_slug}-${data.slug}`;
 
       // Update campaign
       const { error: campaignError } = await supabase
@@ -135,7 +136,14 @@ export const EditCampaign = () => {
           greeting_message: data.greeting_message,
         })
         .eq('id', id)
-        .eq('team_id', team.id);
+        .eq('team_id', currentTeam.team_id);
+
+      console.log('[EditCampaign] campaign update:', {
+        id,
+        teamId: currentTeam.team_id,
+        fullSlug,
+        campaignError,
+      });
 
       if (campaignError) {
         toast({
