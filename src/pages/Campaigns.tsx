@@ -68,9 +68,9 @@ export const Campaigns = () => {
       console.log('[Campaigns] fetchCampaigns: 1. Starting fetch for team:', currentTeam.team_id);
       setLoading(true);
 
-      // console.log('[Campaigns] fetchCampaigns: 2. Awaiting Supabase session...');
-      // await ensureSupabaseSession();
-      // console.log('[Campaigns] fetchCampaigns: 3. Supabase session ensured.');
+      console.log('[Campaigns] fetchCampaigns: 2. Awaiting Supabase session...');
+      await ensureSupabaseSession();
+      console.log('[Campaigns] fetchCampaigns: 3. Supabase session ensured.');
 
       // Fetch campaigns with basic data - seller distribution is now dynamic
       console.log('[Campaigns] fetchCampaigns: 4. Fetching campaigns from Supabase...');

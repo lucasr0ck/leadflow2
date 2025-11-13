@@ -1,7 +1,7 @@
 
 import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseAnonKey } from '@/integrations/supabase/client';
 
 export const PublicRedirect = () => {
   // slug format: "team-slug-campaign-slug" (full_slug from campaigns table)
@@ -16,10 +16,24 @@ export const PublicRedirect = () => {
 
   const handleRedirect = async () => {
     try {
-      // Call the edge function to handle the redirect logic
-      const { data, error } = await supabase.functions.invoke('redirect-handler', {
-        body: { slug }
+      // Call the edge function to handle the redirect logic.
+      // Force the invocation to use the ANON key so it doesn't depend on
+      // the current authenticated session (prevents hangs when an expired
+      // or invalid session is present in cookies).
+      const invokePromise = supabase.functions.invoke('redirect-handler', {
+        body: { slug },
+        // @ts-ignore - supabase-js accepts headers in the invoke options
+        headers: {
+          Authorization: `Bearer ${supabaseAnonKey}`,
+        },
       });
+
+      // Add a timeout to avoid indefinite loading if the function stalls
+      const timeoutMs = 5000;
+      const { data, error } = await Promise.race([
+        invokePromise,
+        new Promise((_res, rej) => setTimeout(() => rej(new Error('redirect-invoke-timeout')), timeoutMs)),
+      ]) as any;
 
       if (error) {
         console.error('Error calling redirect function:', error);
