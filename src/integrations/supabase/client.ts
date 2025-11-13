@@ -41,6 +41,32 @@ try {
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+// Defensive runtime check: ensure we are NOT running with the SERVICE_ROLE key
+function looksLikeJwt(token?: string) {
+  return typeof token === 'string' && token.split('.').length === 3;
+}
+
+function parseJwtPayload(token: string) {
+  try {
+    const parts = token.split('.');
+    const payload = parts[1];
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(json);
+  } catch (e) {
+    return null;
+  }
+}
+
+if (looksLikeJwt(supabaseKey)) {
+  const payload = parseJwtPayload(supabaseKey as string);
+  if (payload && (payload.role === 'service_role' || (payload['https://hasura.io/jwt/claims'] && payload['https://hasura.io/jwt/claims'].role === 'service_role'))) {
+    console.error('[Supabase Client] FATAL: Detected a SERVICE_ROLE key running in the browser.');
+    console.error('[Supabase Client] This is a critical security issue — remove any SERVICE_ROLE key from your frontend build environment.');
+    console.error('[Supabase Client] Aborting client initialization to avoid leaking privileged credentials.');
+    throw new Error('Supabase service_role key detected in frontend environment. Remove it from build env.');
+  }
+}
+
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   auth: {
     storage: localStorage,
