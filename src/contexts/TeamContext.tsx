@@ -629,7 +629,12 @@ export function TeamProvider({ children }: TeamProviderProps) {
       reason: 'cache-hydration',
     });
 
-    setLoading(false);
+    // IMPORTANT: do NOT set `loading` to false here. Keeping `loading` true
+    // ensures that consumers (Dashboard, Campaigns, etc.) do not start
+    // fetching data based solely on cached teams before the full
+    // `loadTeams()` (which validates session and refreshes data) completes.
+    // The actual `loading` state will be cleared by `loadTeams()` when
+    // fresh data is applied or an error occurs.
 
     return true;
   }, [user, applyTeams]);
