@@ -21,6 +21,7 @@ const campaignSchema = z.object({
 });
 
 type CampaignFormData = z.infer<typeof campaignSchema>;
+export const EditCampaign = () => {
 
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -291,4 +292,4 @@ type CampaignFormData = z.infer<typeof campaignSchema>;
       </Card>
     </div>
   );
-;
+};
