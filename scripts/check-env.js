@@ -11,6 +11,23 @@ if (process.env[forbidden]) {
 
 if (!process.env[anonKey]) {
   console.warn(`WARNING: ${anonKey} is not defined in the build environment. The frontend will fail to connect to Supabase.`);
+} else {
+  // Extra safety: ensure the ANON key does not actually contain a service_role token
+  try {
+    const token = process.env[anonKey];
+    const parts = token.split('.');
+    if (parts.length === 3) {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+      const role = payload && (payload.role || (payload['https://hasura.io/jwt/claims'] && payload['https://hasura.io/jwt/claims'].role));
+      if (role === 'service_role') {
+        console.error('ERROR: The value of VITE_SUPABASE_ANON_KEY appears to contain a service_role token.');
+        console.error('This will leak privileged credentials to the browser. Remove/rotate keys and set the correct ANON key.');
+        process.exit(1);
+      }
+    }
+  } catch (e) {
+    console.warn('WARNING: Could not parse VITE_SUPABASE_ANON_KEY JWT payload (non-fatal).');
+  }
 }
 
 console.log('check-env: OK');
