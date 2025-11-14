@@ -5,10 +5,12 @@ import type { Database } from './types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 
 console.log('[Supabase Client] 🔍 ENV VARS CHECK:');
 console.log('[Supabase Client] - VITE_SUPABASE_URL:', supabaseUrl ? 'DEFINED' : 'UNDEFINED');
-console.log('[Supabase Client] - VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? `DEFINED (${supabaseAnonKey.substring(0, 20)}...)` : 'UNDEFINED');
+console.log('[Supabase Client] - VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'DEFINED' : 'UNDEFINED');
+console.log('[Supabase Client] - VITE_SUPABASE_SERVICE_ROLE_KEY:', supabaseServiceRoleKey ? 'DEFINED' : 'UNDEFINED');
 
 // Use ANON key in the client (browser). For non-browser environments (e.g. SSR),
 // it's expected that separate server-side clients are created with the appropriate keys.
@@ -16,8 +18,12 @@ const supabaseKey = supabaseAnonKey;
 
 console.log('[Supabase Client] Initializing with:');
 console.log('[Supabase Client] URL:', supabaseUrl);
+if (supabaseServiceRoleKey) {
+  console.error('[Supabase Client] FATAL: VITE_SUPABASE_SERVICE_ROLE_KEY is defined in the client environment.');
+  console.error('[Supabase Client] This key must not be available to the frontend. Remove it from your build/hosting env.');
+  throw new Error('Supabase service_role key detected in frontend environment (VITE_SUPABASE_SERVICE_ROLE_KEY).');
+}
 console.log('[Supabase Client] Using KEY: ANON (Normal)');
-console.log('[Supabase Client] Key (first 20 chars):', supabaseKey?.substring(0, 20) + '...');
 
 // Validate environment variables
 if (!supabaseUrl || !supabaseKey) {

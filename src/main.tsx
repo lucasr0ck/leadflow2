@@ -6,8 +6,8 @@ import './index.css'
 console.log('=================================================');
 console.log('🔍 ENVIRONMENT VARIABLES CHECK');
 console.log('=================================================');
-console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
-console.log('VITE_SUPABASE_ANON_KEY (first 50 chars):', import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 50) + '...');
+console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL ? 'DEFINED' : 'UNDEFINED');
+console.log('VITE_SUPABASE_ANON_KEY:', import.meta.env.VITE_SUPABASE_ANON_KEY ? 'DEFINED' : 'UNDEFINED');
 console.log('MODE:', import.meta.env.MODE);
 console.log('DEV:', import.meta.env.DEV);
 console.log('PROD:', import.meta.env.PROD);
