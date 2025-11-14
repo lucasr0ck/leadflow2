@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 import { useAuditLog } from '@/hooks/useAuditLog';
@@ -238,8 +238,9 @@ export const EditSellerDialog = ({ seller, open, onOpenChange, onSellerUpdated }
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Editar Vendedor</DialogTitle>
-          </DialogHeader>
+              <DialogTitle>Editar Vendedor</DialogTitle>
+              <DialogDescription className="sr-only">Editar informações do vendedor, incluindo contatos e detalhes.</DialogDescription>
+            </DialogHeader>
           
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
