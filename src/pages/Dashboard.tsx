@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTeam } from '@/contexts/TeamContext';
@@ -34,6 +34,9 @@ export const Dashboard = () => {
   });
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [recentCampaigns, setRecentCampaigns] = useState<any[]>([]);
+  const zeroRetryRef = useRef(0);
+  const zeroRetryTimerRef = useRef<number | null>(null);
+  const MAX_ZERO_RETRIES = 5;
 
   useEffect(() => {
     console.log('[Dashboard] useEffect triggered:', { 
@@ -161,13 +164,33 @@ export const Dashboard = () => {
       // Re-fetch defensivo: se tudo 0 mas há time selecionado, tentar novamente em 1s
       const zeroed = (sellersRes.count ?? 0) === 0 && (campaignsRes.count ?? 0) === 0 && (clicksTodayRes.count ?? 0) === 0;
       if (zeroed) {
-        console.log('[Dashboard] Zeroed metrics detected, scheduling defensive re-fetch...');
-        setTimeout(() => {
-          // evite recaptura se time mudou
-          if (currentTeam?.team_id) {
-            void fetchDashboardData();
+        // Aplicar retry com backoff exponencial e cap para evitar loop infinito
+        zeroRetryRef.current = (zeroRetryRef.current || 0) + 1;
+        if (zeroRetryRef.current > MAX_ZERO_RETRIES) {
+          console.warn('[Dashboard] Zeroed metrics persisted after retries. Stopping defensive re-fetch.');
+        } else {
+          const delay = Math.min(1000 * 2 ** (zeroRetryRef.current - 1), 30000); // 1s,2s,4s... cap 30s
+          console.log('[Dashboard] Zeroed metrics detected, scheduling defensive re-fetch...', { attempt: zeroRetryRef.current, delay });
+          // limpar timer anterior se existir
+          if (zeroRetryTimerRef.current) {
+            window.clearTimeout(zeroRetryTimerRef.current);
           }
-        }, 1000);
+          zeroRetryTimerRef.current = window.setTimeout(() => {
+            // evite recaptura se time mudou
+            if (currentTeam?.team_id) {
+              void fetchDashboardData();
+            }
+          }, delay);
+        }
+      } else {
+        // resetar contador se obtivemos dados válidos
+        if (zeroRetryRef.current) {
+          zeroRetryRef.current = 0;
+          if (zeroRetryTimerRef.current) {
+            window.clearTimeout(zeroRetryTimerRef.current);
+            zeroRetryTimerRef.current = null;
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
