@@ -37,6 +37,7 @@ export const Dashboard = () => {
   const zeroRetryRef = useRef(0);
   const zeroRetryTimerRef = useRef<number | null>(null);
   const MAX_ZERO_RETRIES = 5;
+  const fetchingRef = useRef(false);
 
   useEffect(() => {
     console.log('[Dashboard] useEffect triggered:', { 
@@ -65,6 +66,12 @@ export const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     if (!currentTeam) return;
+
+    if (fetchingRef.current) {
+      console.log('[Dashboard] fetch in progress - skipping concurrent call');
+      return;
+    }
+    fetchingRef.current = true;
 
     try {
       // Garante sessão antes dos selects (evita RLS vazio em primeiro carregamento)
@@ -110,10 +117,10 @@ export const Dashboard = () => {
             .eq('team_id', currentTeam.team_id)
             .gte('created_at', dayStart.toISOString())
             .lt('created_at', dayEnd.toISOString());
-          console.log('[Dashboard] chart day fetch:', {
-            date: format(dayStart, 'MM/dd'),
-            res,
-          });
+          // reduzir verbosidade: log somente em caso de erro
+          if (res.error) {
+            console.warn('[Dashboard] chart day fetch error', { date: format(dayStart, 'MM/dd'), res });
+          }
           return {
             date: format(dayStart, 'MM/dd'),
             clicks: res.count || 0,
@@ -175,12 +182,17 @@ export const Dashboard = () => {
           if (zeroRetryTimerRef.current) {
             window.clearTimeout(zeroRetryTimerRef.current);
           }
-          zeroRetryTimerRef.current = window.setTimeout(() => {
-            // evite recaptura se time mudou
-            if (currentTeam?.team_id) {
-              void fetchDashboardData();
-            }
-          }, delay);
+          // somente agendar se não estivermos atualmente buscando
+          if (!fetchingRef.current) {
+            zeroRetryTimerRef.current = window.setTimeout(() => {
+              // evite recaptura se time mudou
+              if (currentTeam?.team_id) {
+                void fetchDashboardData();
+              }
+            }, delay);
+          } else {
+            console.log('[Dashboard] Skipping scheduling re-fetch because fetch already in progress');
+          }
         }
       } else {
         // resetar contador se obtivemos dados válidos
@@ -194,6 +206,13 @@ export const Dashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+    } finally {
+      fetchingRef.current = false;
+      // ensure we don't leave a dangling timer if we finished with data
+      if (!zeroRetryRef.current && zeroRetryTimerRef.current) {
+        window.clearTimeout(zeroRetryTimerRef.current);
+        zeroRetryTimerRef.current = null;
+      }
     }
   };
 
